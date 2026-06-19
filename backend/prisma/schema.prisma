@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RESIDENT
+}
+
+enum BillStatus {
+  PAID
+  PARTIAL
+  UNPAID
+  WAIVED
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  BANK
+  ADJUSTMENT
+}
+
+enum SalaryStatus {
+  PAID
+  PENDING
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ComplaintCategory {
+  PLUMBING
+  ELECTRICITY
+  LIFT
+  CLEANING
+  SECURITY
+  OTHER
+}
+
+enum ExpenseCategory {
+  ELECTRICITY
+  WATER
+  CLEANER_SALARY
+  SECURITY_SALARY
+  REPAIRS
+  LIFT_MAINTENANCE
+  GARDENING
+  MISCELLANEOUS
+}
+
+enum CashType {
+  IN
+  OUT
+}
+
+enum BankType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+}
+
+enum FlatStatus {
+  ACTIVE
+  VACANT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  email        String?
+  phone        String?
+  passwordHash String
+  role         Role     @default(RESIDENT)
+  flatId       String?
+  flat         Flat?    @relation(fields: [flatId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Flat {
+  id          String            @id @default(cuid())
+  flatNumber  String            @unique
+  ownerName   String
+  phone       String?
+  email       String?
+  monthlyRate Float
+  status      FlatStatus        @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  users       User[]
+  bills       MaintenanceBill[]
+  payments    Payment[]
+  complaints  Complaint[]
+}
+
+model MaintenanceBill {
+  id        String     @id @default(cuid())
+  flatId    String
+  flat      Flat       @relation(fields: [flatId], references: [id])
+  month     String // format YYYY-MM
+  amount    Float
+  dueDate   DateTime
+  status    BillStatus @default(UNPAID)
+  note      String?
+  createdAt DateTime   @default(now())
+  payments  Payment[]
+
+  @@unique([flatId, month])
+}
+
+model Payment {
+  id         String           @id @default(cuid())
+  flatId     String
+  flat       Flat             @relation(fields: [flatId], references: [id])
+  billId     String?
+  bill       MaintenanceBill? @relation(fields: [billId], references: [id])
+  amount     Float
+  date       DateTime
+  mode       PaymentMode      @default(CASH)
+  receiptNo  String           @unique
+  note       String?
+  createdAt  DateTime         @default(now())
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  category    ExpenseCategory
+  amount      Float
+  date        DateTime
+  description String
+  billUpload  String?
+  createdAt   DateTime        @default(now())
+}
+
+model Staff {
+  id           String          @id @default(cuid())
+  name         String
+  role         String
+  salary       Float
+  joiningDate  DateTime
+  status       String          @default("ACTIVE")
+  salaryPayments SalaryPayment[]
+}
+
+model SalaryPayment {
+  id       String       @id @default(cuid())
+  staffId  String
+  staff    Staff        @relation(fields: [staffId], references: [id])
+  month    String // YYYY-MM
+  amount   Float
+  datePaid DateTime?
+  status   SalaryStatus @default(PENDING)
+
+  @@unique([staffId, month])
+}
+
+model CashTransaction {
+  id          String   @id @default(cuid())
+  date        DateTime
+  type        CashType
+  amount      Float
+  balance     Float
+  description String
+  refType     String?
+  refId       String?
+  createdAt   DateTime @default(now())
+}
+
+model BankTransaction {
+  id          String   @id @default(cuid())
+  date        DateTime
+  type        BankType
+  amount      Float
+  balance     Float
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  postedBy  String
+  createdAt DateTime @default(now())
+}
+
+model Complaint {
+  id          String            @id @default(cuid())
+  flatId      String
+  flat        Flat              @relation(fields: [flatId], references: [id])
+  category    ComplaintCategory
+  description String
+  status      ComplaintStatus   @default(OPEN)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
