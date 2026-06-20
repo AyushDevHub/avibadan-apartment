@@ -99,6 +99,7 @@ model Flat {
   bills       MaintenanceBill[]
   payments    Payment[]
   complaints  Complaint[]
+  contributedExpenses Expense[]
 }
 
 model MaintenanceBill {
@@ -137,6 +138,12 @@ model Expense {
   date        DateTime
   description String
   billUpload  String?
+  // Set when a resident paid this expense directly out of pocket (e.g. paid
+  // the electricity bill themselves) instead of giving cash to the admin.
+  // When set, this expense does NOT post to the Cashbook (no cash moved),
+  // and a matching waiver is auto-applied to this flat's dues instead.
+  paidByFlatId String?
+  paidByFlat   Flat?           @relation(fields: [paidByFlatId], references: [id])
   createdAt   DateTime        @default(now())
 }
 
