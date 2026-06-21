@@ -1,47 +1,64 @@
-const prisma = require('../config/prisma');
+const prisma = require("../config/prisma");
+const { getFlatBalance, getCreditProjection } = require("../utils/ledger");
 
 async function listFlats(req, res) {
-  const flats = await prisma.flat.findMany({ orderBy: { flatNumber: 'asc' } });
+  const flats = await prisma.flat.findMany({ orderBy: { flatNumber: "asc" } });
 
-  const flatsWithDue = await Promise.all(
+  const flatsWithBalance = await Promise.all(
     flats.map(async (flat) => {
-      const bills = await prisma.maintenanceBill.findMany({ where: { flatId: flat.id } });
-      const payments = await prisma.payment.findMany({ where: { flatId: flat.id } });
-      const totalBilled = bills.filter((b) => b.status !== 'WAIVED').reduce((s, b) => s + b.amount, 0);
-      const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-      return { ...flat, totalDue: Math.max(totalBilled - totalPaid, 0) };
+      const { totalDue, creditBalance } = await getFlatBalance(flat.id);
+      const credit =
+        creditBalance > 0 ? await getCreditProjection(flat.id) : null;
+      return { ...flat, totalDue, creditBalance, creditProjection: credit };
     })
   );
 
-  res.json(flatsWithDue);
+  res.json(flatsWithBalance);
 }
 
 async function getFlat(req, res) {
   const flat = await prisma.flat.findUnique({ where: { id: req.params.id } });
-  if (!flat) return res.status(404).json({ message: 'Flat not found' });
+  if (!flat) return res.status(404).json({ message: "Flat not found" });
 
   const bills = await prisma.maintenanceBill.findMany({
     where: { flatId: flat.id },
-    orderBy: { month: 'asc' },
+    orderBy: { month: "asc" },
   });
   const payments = await prisma.payment.findMany({
     where: { flatId: flat.id },
-    orderBy: { date: 'asc' },
+    orderBy: { date: "asc" },
   });
 
-  const totalBilled = bills.filter((b) => b.status !== 'WAIVED').reduce((s, b) => s + b.amount, 0);
-  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+  const { totalDue, creditBalance } = await getFlatBalance(flat.id);
+  const creditProjection =
+    creditBalance > 0 ? await getCreditProjection(flat.id) : null;
 
-  res.json({ ...flat, bills, payments, totalDue: Math.max(totalBilled - totalPaid, 0) });
+  res.json({
+    ...flat,
+    bills,
+    payments,
+    totalDue,
+    creditBalance,
+    creditProjection,
+  });
 }
 
 async function createFlat(req, res) {
   const { flatNumber, ownerName, phone, email, monthlyRate, status } = req.body;
   if (!flatNumber || !ownerName || monthlyRate == null) {
-    return res.status(400).json({ message: 'flatNumber, ownerName, monthlyRate are required' });
+    return res
+      .status(400)
+      .json({ message: "flatNumber, ownerName, monthlyRate are required" });
   }
   const flat = await prisma.flat.create({
-    data: { flatNumber, ownerName, phone, email, monthlyRate: Number(monthlyRate), status: status || 'ACTIVE' },
+    data: {
+      flatNumber,
+      ownerName,
+      phone,
+      email,
+      monthlyRate: Number(monthlyRate),
+      status: status || "ACTIVE",
+    },
   });
   res.status(201).json(flat);
 }
