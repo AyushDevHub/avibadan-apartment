@@ -16,7 +16,7 @@ async function nextReceiptNumber() {
 // oldest unpaid bills first, same as paying off old debts before new ones.
 // Any leftover after all dues are cleared is recorded as an advance credit.
 async function createContribution(req, res) {
-  const { flatId, category, amount, date, description } = req.body;
+  const { flatId, category, amount, date, description, billUpload } = req.body;
   if (!flatId || !category || amount == null || !date || !description) {
     return res
       .status(400)
@@ -42,6 +42,7 @@ async function createContribution(req, res) {
       date: new Date(date),
       description,
       paidByFlatId: flatId,
+      billUpload: billUpload || null,
     },
   });
 

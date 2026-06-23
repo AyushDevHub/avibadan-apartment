@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Trash2, Pencil, HandCoins } from "lucide-react";
+import {
+  Plus,
+  X,
+  Trash2,
+  Pencil,
+  HandCoins,
+  Paperclip,
+  Upload,
+  Loader2,
+} from "lucide-react";
 import api from "../../api/client";
 import { PageHeader, Badge, Button } from "../../components/ui";
 
@@ -44,7 +53,7 @@ export default function Expenses() {
     <div>
       <PageHeader
         title="Expenses"
-        description="Society expenses by category."
+        description="Society expenses by category. Attached bills are visible to everyone on the public Transparency page."
         action={
           <div style={{ display: "flex", gap: 8 }}>
             <Button
@@ -61,6 +70,7 @@ export default function Expenses() {
                   amount: "",
                   date: today(),
                   description: "",
+                  billUpload: "",
                 })
               }
             >
@@ -117,6 +127,7 @@ export default function Expenses() {
               <th>Category</th>
               <th>Description</th>
               <th>Funded By</th>
+              <th>Bill</th>
               <th className="right">Amount</th>
               <th className="right">Actions</th>
             </tr>
@@ -124,7 +135,7 @@ export default function Expenses() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={6} className="empty-state">
+                <td colSpan={7} className="empty-state">
                   Loading…
                 </td>
               </tr>
@@ -148,6 +159,25 @@ export default function Expenses() {
                       style={{ color: "var(--text-dim)", fontSize: "0.78rem" }}
                     >
                       Cash box
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {e.billUpload ? (
+                    <a
+                      href={e.billUpload}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="receipt-link"
+                    >
+                      <Paperclip size={12} />
+                      View
+                    </a>
+                  ) : (
+                    <span
+                      style={{ color: "var(--text-dim)", fontSize: "0.75rem" }}
+                    >
+                      —
                     </span>
                   )}
                 </td>
@@ -177,7 +207,7 @@ export default function Expenses() {
             ))}
             {!isLoading && !data?.length && (
               <tr>
-                <td colSpan={6} className="empty-state">
+                <td colSpan={7} className="empty-state">
                   No expenses found.
                 </td>
               </tr>
@@ -203,16 +233,99 @@ export default function Expenses() {
   );
 }
 
+// Shared bill-upload control: picks a file, uploads it immediately to
+// Cloudinary via the backend, and stores the returned permanent URL.
+function BillUpload({ value, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/upload/bill", formData);
+      onChange(res.data.url);
+    } catch (err) {
+      setError(err.response?.data?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="form-group">
+      <label className="form-label">
+        Bill Photo / PDF (optional, visible to everyone)
+      </label>
+      {value ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <a
+            href={value}
+            target="_blank"
+            rel="noreferrer"
+            className="receipt-link"
+          >
+            <Paperclip size={13} />
+            View uploaded bill
+          </a>
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={() => onChange("")}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <label
+          className="btn btn-ghost"
+          style={{ cursor: "pointer", width: "fit-content" }}
+        >
+          {uploading ? (
+            <Loader2 size={14} className="spin" />
+          ) : (
+            <Upload size={14} />
+          )}
+          {uploading ? "Uploading…" : "Choose file"}
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            onChange={handleFile}
+            disabled={uploading}
+            style={{ display: "none" }}
+          />
+        </label>
+      )}
+      {error && (
+        <div style={{ fontSize: "0.75rem", color: "var(--rust-light)" }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExpenseForm({ expense, onClose, queryClient }) {
   const isEdit = !!expense.id;
   const [category, setCategory] = useState(expense.category);
   const [amount, setAmount] = useState(expense.amount);
   const [date, setDate] = useState(expense.date);
   const [description, setDescription] = useState(expense.description);
+  const [billUpload, setBillUpload] = useState(expense.billUpload || "");
 
   const mutation = useMutation({
     mutationFn: () => {
-      const body = { category, amount: Number(amount), date, description };
+      const body = {
+        category,
+        amount: Number(amount),
+        date,
+        description,
+        billUpload: billUpload || null,
+      };
       return isEdit
         ? api.put(`/expenses/${expense.id}`, body)
         : api.post("/expenses", body);
@@ -286,6 +399,7 @@ function ExpenseForm({ expense, onClose, queryClient }) {
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
+          <BillUpload value={billUpload} onChange={setBillUpload} />
           {isEdit && expense.paidByFlatId && (
             <p style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
               This was a resident-funded contribution. Editing here only updates
@@ -310,6 +424,7 @@ function ContributionForm({ onClose, queryClient }) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [description, setDescription] = useState("");
+  const [billUpload, setBillUpload] = useState("");
 
   const { data: flats } = useQuery({
     queryKey: ["flats"],
@@ -324,6 +439,7 @@ function ContributionForm({ onClose, queryClient }) {
         amount: Number(amount),
         date,
         description,
+        billUpload: billUpload || null,
       }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -428,6 +544,7 @@ function ContributionForm({ onClose, queryClient }) {
               placeholder="e.g. June electricity bill paid directly"
             />
           </div>
+          <BillUpload value={billUpload} onChange={setBillUpload} />
           <div className="modal-actions">
             <Button type="submit" disabled={mutation.isPending || !flatId}>
               {mutation.isPending ? "Processing…" : "Record & Auto-Waive"}
