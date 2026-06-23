@@ -5,6 +5,7 @@ const { authRequired, adminOnly } = require("../middleware/auth");
 const router = express.Router();
 
 router.get("/", authRequired, ctrl.listCashLedger);
+router.get("/years", authRequired, ctrl.listAvailableYears);
 router.post("/manual", authRequired, adminOnly, ctrl.addManualEntry);
 router.put("/manual/:id", authRequired, adminOnly, ctrl.updateManualEntry);
 router.delete("/manual/:id", authRequired, adminOnly, ctrl.deleteManualEntry);

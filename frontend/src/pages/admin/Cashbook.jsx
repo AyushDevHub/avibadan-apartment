@@ -9,12 +9,21 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function Cashbook() {
   const queryClient = useQueryClient();
   const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
   const [editing, setEditing] = useState(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["cashbook", month],
+    queryKey: ["cashbook", month, year],
     queryFn: async () =>
-      (await api.get("/cashbook", { params: { month } })).data,
+      (
+        await api.get("/cashbook", {
+          params: { month, year: month ? "" : year },
+        })
+      ).data,
+  });
+  const { data: years } = useQuery({
+    queryKey: ["cashbook-years"],
+    queryFn: async () => (await api.get("/cashbook/years")).data,
   });
 
   const deleteMutation = useMutation({
@@ -26,11 +35,13 @@ export default function Cashbook() {
     onError: (err) => alert(err.response?.data?.message || "Could not delete"),
   });
 
+  const viewingPeriod = month || year;
+
   return (
     <div>
       <PageHeader
         title="Cashbook"
-        description="Opening balance + collections − expenses = cash in hand."
+        description="Opening balance + collections − expenses = closing balance."
         action={
           <Button onClick={() => setEditing({})}>
             <Plus size={15} />
@@ -39,15 +50,17 @@ export default function Cashbook() {
         }
       />
 
-      <div className="stat-grid cols-4" style={{ marginBottom: 20 }}>
+      <div className="stat-grid cols-4" style={{ marginBottom: 8 }}>
         <div className="stat-card">
-          <div className="stat-label">Cash in Hand</div>
+          <div className="stat-label">Cash in Hand (today)</div>
           <div className="stat-value sage">
             ₹{Number(data?.cashInHand || 0).toLocaleString("en-IN")}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Opening (period)</div>
+          <div className="stat-label">
+            {viewingPeriod ? "Opening (period)" : "Opening Balance"}
+          </div>
           <div className="stat-value">
             ₹{Number(data?.openingBalance || 0).toLocaleString("en-IN")}
           </div>
@@ -66,13 +79,65 @@ export default function Cashbook() {
         </div>
       </div>
 
+      {viewingPeriod && (
+        <div
+          className="stat-grid"
+          style={{ marginBottom: 20, gridTemplateColumns: "1fr" }}
+        >
+          <div className="stat-card">
+            <div className="stat-label">Closing Balance for this period</div>
+            <div
+              className={`stat-value ${
+                data?.closingBalance >= 0 ? "sage" : "rust"
+              }`}
+            >
+              ₹{Number(data?.closingBalance || 0).toLocaleString("en-IN")}
+            </div>
+            <div className="stat-sub">
+              This is opening + collections − expenses. "Cash in Hand" above is
+              always today's real balance, not this period's.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <input
           type="month"
           className="form-input"
           value={month}
-          onChange={(e) => setMonth(e.target.value)}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            if (e.target.value) setYear("");
+          }}
+          placeholder="Filter by month"
         />
+        <select
+          className="form-select"
+          value={year}
+          onChange={(e) => {
+            setYear(e.target.value);
+            if (e.target.value) setMonth("");
+          }}
+        >
+          <option value="">Filter by year…</option>
+          {years?.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+        {(month || year) && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMonth("");
+              setYear("");
+            }}
+          >
+            Clear filter
+          </Button>
+        )}
       </div>
 
       <div className="table-wrap">
@@ -182,6 +247,7 @@ function ManualForm({ entry, onClose, queryClient }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cashbook"] });
+      queryClient.invalidateQueries({ queryKey: ["cashbook-years"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       onClose();
     },

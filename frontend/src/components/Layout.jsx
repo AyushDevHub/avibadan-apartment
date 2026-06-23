@@ -20,6 +20,7 @@ import {
   X,
   Sun,
   Moon,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -37,6 +38,7 @@ const ADMIN_NAV = [
   { to: "/admin/notices", label: "Notices", icon: Megaphone },
   { to: "/admin/complaints", label: "Complaints", icon: MessageSquare },
   { to: "/admin/reports", label: "Reports", icon: FileBarChart },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/transparency", label: "Transparency", icon: Eye },
 ];
 
@@ -47,6 +49,7 @@ const RESIDENT_NAV = [
   { to: "/transparency", label: "Transparency", icon: Eye },
 ];
 
+// Bottom nav shows only the 5 most important items on mobile
 const ADMIN_BOTTOM = [
   { to: "/admin/dashboard", label: "Home", icon: LayoutDashboard },
   { to: "/admin/payments", label: "Payments", icon: Wallet },
@@ -76,11 +79,13 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      {/* Backdrop */}
       <div
         className={`backdrop ${open ? "open" : ""}`}
         onClick={() => setOpen(false)}
       />
 
+      {/* Sidebar */}
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="sidebar-brand">
           <div className="sidebar-brand-inner">
@@ -126,7 +131,9 @@ export default function Layout() {
         </div>
       </aside>
 
+      {/* Main content */}
       <div className="main-area">
+        {/* Mobile topbar */}
         <header className="topbar">
           <button className="topbar-hamburger" onClick={() => setOpen(true)}>
             <Menu size={22} />
@@ -137,11 +144,13 @@ export default function Layout() {
           </div>
         </header>
 
+        {/* Page content */}
         <main className="page">
           <Outlet />
         </main>
       </div>
 
+      {/* Mobile bottom nav */}
       <nav className="bottom-nav">
         {bottomNav.map(({ to, label, icon: Icon }) => (
           <NavLink
