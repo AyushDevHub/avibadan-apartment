@@ -1,44 +1,19 @@
 const prisma = require("../config/prisma");
 const { getFlatBalance, getCreditProjection } = require("../utils/ledger");
 
-function currentMonthStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
 async function duesDashboard(req, res) {
   const flats = await prisma.flat.findMany({ orderBy: { flatNumber: "asc" } });
-  const thisMonth = currentMonthStr();
 
   const rows = await Promise.all(
     flats.map(async (flat) => {
-      const bills = await prisma.maintenanceBill.findMany({
-        where: { flatId: flat.id },
-      });
-      const { totalBilled, totalPaid, totalDue, creditBalance } =
-        await getFlatBalance(flat.id);
-
-      const currentBill = bills.find((b) => b.month === thisMonth);
-      const currentDue =
-        currentBill &&
-        currentBill.status !== "WAIVED" &&
-        currentBill.status !== "PAID"
-          ? currentBill.amount -
-            (totalPaid > totalBilled - currentBill.amount
-              ? totalPaid - (totalBilled - currentBill.amount)
-              : 0)
-          : 0;
-
-      const previousDue = Math.max(totalDue - Math.max(currentDue, 0), 0);
+      const { totalDue, creditBalance } = await getFlatBalance(flat.id);
       const creditProjection =
         creditBalance > 0 ? await getCreditProjection(flat.id) : null;
-
       return {
         flatId: flat.id,
         flatNumber: flat.flatNumber,
         ownerName: flat.ownerName,
-        currentMonthDue: Math.max(currentDue, 0),
-        previousDue,
+        monthlyRate: flat.monthlyRate,
         totalDue,
         creditBalance,
         creditProjection,

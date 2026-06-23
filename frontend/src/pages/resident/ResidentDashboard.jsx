@@ -185,18 +185,35 @@ export default function ResidentDashboard() {
                           </Badge>
                         </td>
                         <td>
-                          <a
-                            href={`${
-                              import.meta.env.VITE_API_URL ||
-                              "http://localhost:5000/api"
-                            }/receipts/${p.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="receipt-link"
-                          >
-                            <Download size={13} />
-                            {p.receiptNo}
-                          </a>
+                          {p.groupReceiptNo ? (
+                            <a
+                              href={`${
+                                import.meta.env.VITE_API_URL ||
+                                "http://localhost:5000/api"
+                              }/receipts/group/${encodeURIComponent(
+                                p.groupReceiptNo
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="receipt-link"
+                            >
+                              <Download size={13} />
+                              Consolidated
+                            </a>
+                          ) : (
+                            <a
+                              href={`${
+                                import.meta.env.VITE_API_URL ||
+                                "http://localhost:5000/api"
+                              }/receipts/${p.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="receipt-link"
+                            >
+                              <Download size={13} />
+                              {p.receiptNo}
+                            </a>
+                          )}
                         </td>
                       </tr>
                     ))}

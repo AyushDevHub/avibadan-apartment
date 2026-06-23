@@ -11,6 +11,7 @@ const EMPTY = {
   phone: "",
   email: "",
   monthlyRate: "",
+  maintenanceStartMonth: "",
   status: "ACTIVE",
 };
 
@@ -23,7 +24,7 @@ export default function Residents() {
   const [form, setForm] = useState(null);
 
   const saveMutation = useMutation({
-    mutationFn: async (flat) =>
+    mutationFn: (flat) =>
       flat.id ? api.put(`/flats/${flat.id}`, flat) : api.post("/flats", flat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flats"] });
@@ -31,7 +32,7 @@ export default function Residents() {
     },
   });
   const deleteMutation = useMutation({
-    mutationFn: async (id) => api.delete(`/flats/${id}`),
+    mutationFn: (id) => api.delete(`/flats/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["flats"] }),
   });
 
@@ -39,7 +40,7 @@ export default function Residents() {
     <div>
       <PageHeader
         title="Residents"
-        description="Flats, owners and monthly rates."
+        description="Flats and owners. Set Tracking Start Month so balances calculate correctly from day one."
         action={
           <Button onClick={() => setForm(EMPTY)}>
             <Plus size={15} />
@@ -54,17 +55,16 @@ export default function Residents() {
             <tr>
               <th>Flat</th>
               <th>Owner</th>
-              <th>Phone</th>
-              <th className="right">Monthly ₹</th>
-              <th className="right">Due</th>
-              <th>Status</th>
+              <th>Tracking From</th>
+              <th className="right">Rate/mo</th>
+              <th className="right">Due / Credit</th>
               <th className="right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="empty-state">
+                <td colSpan={6} className="empty-state">
                   Loading…
                 </td>
               </tr>
@@ -81,14 +81,20 @@ export default function Residents() {
                   </Link>
                 </td>
                 <td>{f.ownerName}</td>
-                <td style={{ color: "var(--text-muted)" }}>{f.phone || "—"}</td>
+                <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                  {f.maintenanceStartMonth || (
+                    <span style={{ color: "var(--rust-light)" }}>
+                      ⚠ Not set
+                    </span>
+                  )}
+                </td>
                 <td className="right mono">
                   ₹{Number(f.monthlyRate).toLocaleString("en-IN")}
                 </td>
                 <td className="right">
                   {f.totalDue > 0 ? (
                     <Badge tone="rust">
-                      ₹{f.totalDue.toLocaleString("en-IN")}
+                      Due ₹{f.totalDue.toLocaleString("en-IN")}
                     </Badge>
                   ) : f.creditBalance > 0 ? (
                     <div>
@@ -100,10 +106,10 @@ export default function Residents() {
                           style={{
                             fontSize: "0.68rem",
                             color: "var(--text-dim)",
-                            marginTop: 3,
+                            marginTop: 2,
                           }}
                         >
-                          paid till {f.creditProjection.coveredUntilLabel}
+                          till {f.creditProjection.coveredUntilLabel}
                         </div>
                       )}
                     </div>
@@ -111,13 +117,16 @@ export default function Residents() {
                     <Badge tone="sage">Settled</Badge>
                   )}
                 </td>
-                <td>
-                  <Badge tone={f.status === "ACTIVE" ? "sage" : "ink"}>
-                    {f.status}
-                  </Badge>
-                </td>
                 <td className="right" style={{ whiteSpace: "nowrap" }}>
-                  <button className="btn-icon" onClick={() => setForm(f)}>
+                  <button
+                    className="btn-icon"
+                    onClick={() =>
+                      setForm({
+                        ...f,
+                        maintenanceStartMonth: f.maintenanceStartMonth || "",
+                      })
+                    }
+                  >
                     <Pencil size={15} />
                   </button>
                   <button
@@ -155,16 +164,30 @@ export default function Residents() {
               }}
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
-              <div className="form-group">
-                <label className="form-label">Flat Number</label>
-                <input
-                  required
-                  className="form-input"
-                  value={form.flatNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, flatNumber: e.target.value })
-                  }
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Flat Number</label>
+                  <input
+                    required
+                    className="form-input"
+                    value={form.flatNumber}
+                    onChange={(e) =>
+                      setForm({ ...form, flatNumber: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Monthly Rate (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    className="form-input"
+                    value={form.monthlyRate}
+                    onChange={(e) =>
+                      setForm({ ...form, monthlyRate: e.target.value })
+                    }
+                  />
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Owner Name</label>
@@ -199,32 +222,35 @@ export default function Residents() {
                   />
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Monthly Rate (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    className="form-input"
-                    value={form.monthlyRate}
-                    onChange={(e) =>
-                      setForm({ ...form, monthlyRate: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select
-                    className="form-select"
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.value })
-                    }
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="VACANT">Vacant</option>
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Tracking Start Month — IMPORTANT
+                </label>
+                <input
+                  type="month"
+                  className="form-input"
+                  value={form.maintenanceStartMonth || ""}
+                  onChange={(e) =>
+                    setForm({ ...form, maintenanceStartMonth: e.target.value })
+                  }
+                />
+                <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>
+                  Set to the first month you want to track this flat's dues
+                  from. Example: 2024-01 if you're entering data from January
+                  2024. All balances calculate from this month automatically —
+                  no need to generate bills first.
+                </span>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select
+                  className="form-select"
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="VACANT">Vacant</option>
+                </select>
               </div>
               <div className="modal-actions">
                 <Button type="submit" disabled={saveMutation.isPending}>

@@ -8,13 +8,15 @@ export default function Dues() {
     queryKey: ["dues"],
     queryFn: async () => (await api.get("/dues")).data,
   });
+
   return (
     <div>
       <PageHeader
-        title="Dues Dashboard"
-        description="Outstanding maintenance dues and credit balances, flat by flat."
+        title="Dues"
+        description="Rate-based outstanding dues and credits — accurate even without generating bills first."
       />
-      <div className="stat-grid" style={{ marginBottom: 24 }}>
+
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card">
           <div className="stat-label">Total Outstanding</div>
           <div className="stat-value rust">
@@ -22,22 +24,23 @@ export default function Dues() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Total Credit (owed to residents)</div>
+          <div className="stat-label">Total Credit Held</div>
           <div className="stat-value gold">
             ₹{Number(data?.totalCredit || 0).toLocaleString("en-IN")}
           </div>
         </div>
       </div>
+
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Flat</th>
               <th>Owner</th>
-              <th className="right">Current Month</th>
-              <th className="right">Previous</th>
+              <th className="right">Rate/mo</th>
               <th className="right">Total Due</th>
               <th className="right">Credit</th>
+              <th>Credit Covers</th>
             </tr>
           </thead>
           <tbody>
@@ -61,10 +64,7 @@ export default function Dues() {
                 </td>
                 <td>{f.ownerName}</td>
                 <td className="right mono">
-                  ₹{Number(f.currentMonthDue).toLocaleString("en-IN")}
-                </td>
-                <td className="right mono">
-                  ₹{Number(f.previousDue).toLocaleString("en-IN")}
+                  ₹{Number(f.monthlyRate).toLocaleString("en-IN")}
                 </td>
                 <td className="right">
                   {f.totalDue > 0 ? (
@@ -72,30 +72,24 @@ export default function Dues() {
                       ₹{f.totalDue.toLocaleString("en-IN")}
                     </Badge>
                   ) : (
-                    <Badge tone="sage">Settled</Badge>
+                    <Badge tone="sage">Nil</Badge>
                   )}
                 </td>
                 <td className="right">
                   {f.creditBalance > 0 ? (
-                    <div>
-                      <Badge tone="gold">
-                        +₹{f.creditBalance.toLocaleString("en-IN")}
-                      </Badge>
-                      {f.creditProjection?.coveredUntilLabel && (
-                        <div
-                          style={{
-                            fontSize: "0.68rem",
-                            color: "var(--text-dim)",
-                            marginTop: 3,
-                          }}
-                        >
-                          till {f.creditProjection.coveredUntilLabel}
-                        </div>
-                      )}
-                    </div>
+                    <Badge tone="gold">
+                      +₹{f.creditBalance.toLocaleString("en-IN")}
+                    </Badge>
                   ) : (
                     <span style={{ color: "var(--text-dim)" }}>—</span>
                   )}
+                </td>
+                <td style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  {f.creditProjection?.coveredUntilLabel
+                    ? `Paid through ${f.creditProjection.coveredUntilLabel}`
+                    : f.creditBalance > 0
+                    ? "Less than 1 month"
+                    : "—"}
                 </td>
               </tr>
             ))}

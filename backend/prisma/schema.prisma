@@ -87,26 +87,27 @@ model User {
 }
 
 model Flat {
-  id          String            @id @default(cuid())
-  flatNumber  String            @unique
-  ownerName   String
-  phone       String?
-  email       String?
-  monthlyRate Float
-  status      FlatStatus        @default(ACTIVE)
-  createdAt   DateTime          @default(now())
-  users       User[]
-  bills       MaintenanceBill[]
-  payments    Payment[]
-  complaints  Complaint[]
-  contributedExpenses Expense[]
+  id                    String            @id @default(cuid())
+  flatNumber            String            @unique
+  ownerName             String
+  phone                 String?
+  email                 String?
+  monthlyRate           Float
+  maintenanceStartMonth String?
+  status                FlatStatus        @default(ACTIVE)
+  createdAt             DateTime          @default(now())
+  users                 User[]
+  bills                 MaintenanceBill[]
+  payments              Payment[]
+  complaints            Complaint[]
+  contributedExpenses   Expense[]
 }
 
 model MaintenanceBill {
   id        String     @id @default(cuid())
   flatId    String
   flat      Flat       @relation(fields: [flatId], references: [id])
-  month     String // format YYYY-MM
+  month     String
   amount    Float
   dueDate   DateTime
   status    BillStatus @default(UNPAID)
@@ -118,42 +119,39 @@ model MaintenanceBill {
 }
 
 model Payment {
-  id         String           @id @default(cuid())
-  flatId     String
-  flat       Flat             @relation(fields: [flatId], references: [id])
-  billId     String?
-  bill       MaintenanceBill? @relation(fields: [billId], references: [id])
-  amount     Float
-  date       DateTime
-  mode       PaymentMode      @default(CASH)
-  receiptNo  String           @unique
-  note       String?
-  createdAt  DateTime         @default(now())
+  id             String           @id @default(cuid())
+  flatId         String
+  flat           Flat             @relation(fields: [flatId], references: [id])
+  billId         String?
+  bill           MaintenanceBill? @relation(fields: [billId], references: [id])
+  amount         Float
+  date           DateTime
+  mode           PaymentMode      @default(CASH)
+  receiptNo      String           @unique
+  groupReceiptNo String?
+  note           String?
+  createdAt      DateTime         @default(now())
 }
 
 model Expense {
-  id          String          @id @default(cuid())
-  category    ExpenseCategory
-  amount      Float
-  date        DateTime
-  description String
-  billUpload  String?
-  // Set when a resident paid this expense directly out of pocket (e.g. paid
-  // the electricity bill themselves) instead of giving cash to the admin.
-  // When set, this expense does NOT post to the Cashbook (no cash moved),
-  // and a matching waiver is auto-applied to this flat's dues instead.
+  id           String          @id @default(cuid())
+  category     ExpenseCategory
+  amount       Float
+  date         DateTime
+  description  String
+  billUpload   String?
   paidByFlatId String?
   paidByFlat   Flat?           @relation(fields: [paidByFlatId], references: [id])
-  createdAt   DateTime        @default(now())
+  createdAt    DateTime        @default(now())
 }
 
 model Staff {
-  id           String          @id @default(cuid())
-  name         String
-  role         String
-  salary       Float
-  joiningDate  DateTime
-  status       String          @default("ACTIVE")
+  id             String          @id @default(cuid())
+  name           String
+  role           String
+  salary         Float
+  joiningDate    DateTime
+  status         String          @default("ACTIVE")
   salaryPayments SalaryPayment[]
 }
 
@@ -161,7 +159,7 @@ model SalaryPayment {
   id       String       @id @default(cuid())
   staffId  String
   staff    Staff        @relation(fields: [staffId], references: [id])
-  month    String // YYYY-MM
+  month    String
   amount   Float
   datePaid DateTime?
   status   SalaryStatus @default(PENDING)
