@@ -2,39 +2,28 @@ const prisma = require("../config/prisma");
 const { appendCashTransaction } = require("./paymentController");
 const { rebuildCashBalances } = require("../utils/ledger");
 
-// month = 'YYYY-MM' (a specific month), year = 'YYYY' (a whole calendar year).
-// If both are given, month wins. If neither, shows everything ever recorded.
 async function listCashLedger(req, res) {
-  const { from, to, month, year } = req.query;
-  const transactions = await prisma.cashTransaction.findMany({
-    where: {
-      ...((from || to) && {
-        date: {
-          ...(from && { gte: new Date(from) }),
-          ...(to && { lte: new Date(to) }),
-        },
-      }),
-    },
-    orderBy: { date: "asc" },
+  const { month, year } = req.query;
+
+  // Always fetch ALL transactions for correct running balance
+  const allTransactions = await prisma.cashTransaction.findMany({
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });
 
-  let filtered = transactions;
+  // Filter for display only - balance numbers are from the full ledger
+  let filtered = allTransactions;
   if (month) {
-    filtered = transactions.filter(
+    filtered = allTransactions.filter(
       (t) => t.date.toISOString().slice(0, 7) === month
     );
   } else if (year) {
-    filtered = transactions.filter(
+    filtered = allTransactions.filter(
       (t) => String(t.date.getFullYear()) === String(year)
     );
   }
 
-  // "Cash in Hand" is always TODAY's real balance, regardless of what
-  // period you're viewing - it never changes when you filter to a past
-  // month/year. "Opening" and "Closing" below are scoped to the filtered
-  // period instead, so you can see what your balance was back then.
-  const cashInHand = transactions.length
-    ? transactions[transactions.length - 1].balance
+  const cashInHand = allTransactions.length
+    ? allTransactions[allTransactions.length - 1].balance
     : 0;
 
   const totalIn = filtered
@@ -49,43 +38,38 @@ async function listCashLedger(req, res) {
       (filtered[0].type === "IN" ? filtered[0].amount : -filtered[0].amount)
     : cashInHand;
 
-  // The balance at the END of the filtered period - this is the number that
-  // actually matches "opening + collections - expenses" for that period.
   const closingBalance = filtered.length
     ? filtered[filtered.length - 1].balance
     : openingBalance;
 
+  // Oldest at top, newest at bottom - natural register order
   res.json({
     cashInHand,
     openingBalance,
     closingBalance,
     totalIn,
     totalOut,
-    transactions: [...filtered].reverse(),
+    transactions: filtered,
   });
 }
 
-// Returns every year that has at least one transaction, for populating a
-// year picker on the Cashbook page.
 async function listAvailableYears(req, res) {
   const transactions = await prisma.cashTransaction.findMany({
     select: { date: true },
   });
   const years = [
     ...new Set(transactions.map((t) => t.date.getFullYear())),
-  ].sort((a, b) => b - a);
+  ].sort((a, b) => a - b);
   res.json(years);
 }
 
-// Manual entry, e.g. your opening balance, or a stray cash adjustment that
-// doesn't belong to a specific Payment or Expense.
 async function addManualEntry(req, res) {
   const { date, type, amount, description } = req.body;
-  if (!date || !type || amount == null || !description) {
+  if (!date || !type || amount == null || !description)
     return res
       .status(400)
       .json({ message: "date, type, amount, description are required" });
-  }
+
   const tx = await appendCashTransaction({
     date: new Date(date),
     type,
@@ -97,20 +81,15 @@ async function addManualEntry(req, res) {
   res.status(201).json(tx);
 }
 
-// Only MANUAL entries can be edited/deleted directly here. Entries created
-// by a Payment or Expense are edited by editing that Payment/Expense instead
-// - that keeps the ledger from silently drifting out of sync with its source.
 async function updateManualEntry(req, res) {
   const existing = await prisma.cashTransaction.findUnique({
     where: { id: req.params.id },
   });
   if (!existing) return res.status(404).json({ message: "Entry not found" });
-  if (existing.refType !== "MANUAL") {
-    return res.status(400).json({
-      message:
-        "This entry was created by a Payment or Expense. Edit it from the Payments or Expenses page instead.",
-    });
-  }
+  if (existing.refType !== "MANUAL")
+    return res
+      .status(400)
+      .json({ message: "Only manual entries can be edited here." });
 
   const { date, type, amount, description } = req.body;
   await prisma.cashTransaction.update({
@@ -122,7 +101,6 @@ async function updateManualEntry(req, res) {
       ...(description !== undefined && { description }),
     },
   });
-
   await rebuildCashBalances();
   const updated = await prisma.cashTransaction.findUnique({
     where: { id: req.params.id },
@@ -135,12 +113,10 @@ async function deleteManualEntry(req, res) {
     where: { id: req.params.id },
   });
   if (!existing) return res.status(404).json({ message: "Entry not found" });
-  if (existing.refType !== "MANUAL") {
-    return res.status(400).json({
-      message:
-        "This entry was created by a Payment or Expense. Delete it from the Payments or Expenses page instead.",
-    });
-  }
+  if (existing.refType !== "MANUAL")
+    return res
+      .status(400)
+      .json({ message: "Only manual entries can be deleted here." });
 
   await prisma.cashTransaction.delete({ where: { id: req.params.id } });
   await rebuildCashBalances();

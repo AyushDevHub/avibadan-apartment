@@ -2,9 +2,23 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Trash2, Pencil } from "lucide-react";
 import api from "../../api/client";
-import { PageHeader, Badge, Button } from "../../components/ui";
+import { PageHeader, Button } from "../../components/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+// Human-readable labels instead of IN/OUT
+function typeLabel(type, refType) {
+  if (refType === "MANUAL")
+    return type === "IN" ? "Received (manual)" : "Spent (manual)";
+  if (refType === "PAYMENT") return "Maintenance received";
+  if (refType === "EXPENSE") return "Expense paid";
+  if (refType === "SALARY") return "Salary paid";
+  return type === "IN" ? "Received" : "Spent";
+}
+
+function typeColor(type) {
+  return type === "IN" ? "var(--sage-light)" : "var(--rust-light)";
+}
 
 export default function Cashbook() {
   const queryClient = useQueryClient();
@@ -32,7 +46,8 @@ export default function Cashbook() {
       queryClient.invalidateQueries({ queryKey: ["cashbook"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
     },
-    onError: (err) => alert(err.response?.data?.message || "Could not delete"),
+    onError: (err) =>
+      alert(err.response?.data?.message || "Cannot delete this entry"),
   });
 
   const viewingPeriod = month || year;
@@ -41,21 +56,23 @@ export default function Cashbook() {
     <div>
       <PageHeader
         title="Cashbook"
-        description="Opening balance + collections − expenses = closing balance."
+        description="Every rupee received and spent. Oldest entries at top, newest at bottom."
         action={
           <Button onClick={() => setEditing({})}>
             <Plus size={15} />
-            Manual Entry
+            Add Entry
           </Button>
         }
       />
 
-      <div className="stat-grid cols-4" style={{ marginBottom: 8 }}>
+      {/* Summary cards */}
+      <div className="stat-grid cols-4" style={{ marginBottom: 16 }}>
         <div className="stat-card">
-          <div className="stat-label">Cash in Hand (today)</div>
+          <div className="stat-label">Cash in Hand (Today)</div>
           <div className="stat-value sage">
             ₹{Number(data?.cashInHand || 0).toLocaleString("en-IN")}
           </div>
+          <div className="stat-sub">Your actual cash right now</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">
@@ -64,43 +81,67 @@ export default function Cashbook() {
           <div className="stat-value">
             ₹{Number(data?.openingBalance || 0).toLocaleString("en-IN")}
           </div>
+          <div className="stat-sub">Balance before this period</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Collections</div>
+          <div className="stat-label">Money Received</div>
           <div className="stat-value sage">
-            ₹{Number(data?.totalIn || 0).toLocaleString("en-IN")}
+            +₹{Number(data?.totalIn || 0).toLocaleString("en-IN")}
+          </div>
+          <div className="stat-sub">
+            {viewingPeriod ? "In this period" : "All time"}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Expenses</div>
+          <div className="stat-label">Money Spent</div>
           <div className="stat-value rust">
-            ₹{Number(data?.totalOut || 0).toLocaleString("en-IN")}
+            -₹{Number(data?.totalOut || 0).toLocaleString("en-IN")}
+          </div>
+          <div className="stat-sub">
+            {viewingPeriod ? "In this period" : "All time"}
           </div>
         </div>
       </div>
 
+      {/* Period closing balance */}
       {viewingPeriod && (
         <div
-          className="stat-grid"
-          style={{ marginBottom: 20, gridTemplateColumns: "1fr" }}
+          className="card card-body"
+          style={{ marginBottom: 16, background: "var(--bg-active)" }}
         >
-          <div className="stat-card">
-            <div className="stat-label">Closing Balance for this period</div>
-            <div
-              className={`stat-value ${
-                data?.closingBalance >= 0 ? "sage" : "rust"
-              }`}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              Closing balance for this period = ₹
+              {Number(data?.openingBalance || 0).toLocaleString("en-IN")} + ₹
+              {Number(data?.totalIn || 0).toLocaleString("en-IN")} − ₹
+              {Number(data?.totalOut || 0).toLocaleString("en-IN")}
+            </span>
+            <span
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                fontWeight: 700,
+                fontSize: "1.1rem",
+                color:
+                  data?.closingBalance >= 0
+                    ? "var(--sage-light)"
+                    : "var(--rust-light)",
+              }}
             >
-              ₹{Number(data?.closingBalance || 0).toLocaleString("en-IN")}
-            </div>
-            <div className="stat-sub">
-              This is opening + collections − expenses. "Cash in Hand" above is
-              always today's real balance, not this period's.
-            </div>
+              = ₹{Number(data?.closingBalance || 0).toLocaleString("en-IN")}
+            </span>
           </div>
         </div>
       )}
 
+      {/* Filters */}
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <input
           type="month"
@@ -110,7 +151,7 @@ export default function Cashbook() {
             setMonth(e.target.value);
             if (e.target.value) setYear("");
           }}
-          placeholder="Filter by month"
+          style={{ maxWidth: 160 }}
         />
         <select
           className="form-select"
@@ -119,6 +160,7 @@ export default function Cashbook() {
             setYear(e.target.value);
             if (e.target.value) setMonth("");
           }}
+          style={{ maxWidth: 150 }}
         >
           <option value="">Filter by year…</option>
           {years?.map((y) => (
@@ -135,21 +177,22 @@ export default function Cashbook() {
               setYear("");
             }}
           >
-            Clear filter
+            Clear
           </Button>
         )}
       </div>
 
+      {/* Ledger table — oldest at top, newest at bottom */}
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Date</th>
-              <th>Type</th>
               <th>Description</th>
+              <th>Type</th>
               <th className="right">Amount</th>
               <th className="right">Balance</th>
-              <th className="right">Actions</th>
+              <th className="right">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -160,22 +203,33 @@ export default function Cashbook() {
                 </td>
               </tr>
             )}
-            {data?.transactions?.map((t) => (
-              <tr key={t.id}>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  {new Date(t.date).toLocaleDateString("en-IN")}
+
+            {data?.transactions?.map((t, i) => (
+              <tr
+                key={t.id}
+                style={{
+                  background: i % 2 === 0 ? "transparent" : "var(--bg-hover)",
+                }}
+              >
+                <td style={{ whiteSpace: "nowrap", fontSize: "0.8rem" }}>
+                  {new Date(t.date).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </td>
-                <td>
-                  <Badge tone={t.type === "IN" ? "sage" : "rust"}>
-                    {t.type}
-                  </Badge>
+                <td style={{ fontSize: "0.82rem" }}>{t.description}</td>
+                <td style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+                  {typeLabel(t.type, t.refType)}
                 </td>
-                <td style={{ fontSize: "0.8rem" }}>{t.description}</td>
-                <td className="right mono">
+                <td
+                  className="right mono"
+                  style={{ color: typeColor(t.type), fontWeight: 600 }}
+                >
                   {t.type === "IN" ? "+" : "-"}₹
                   {Number(t.amount).toLocaleString("en-IN")}
                 </td>
-                <td className="right mono">
+                <td className="right mono" style={{ fontWeight: 600 }}>
                   ₹{Number(t.balance).toLocaleString("en-IN")}
                 </td>
                 <td className="right" style={{ whiteSpace: "nowrap" }}>
@@ -203,16 +257,17 @@ export default function Cashbook() {
                     <span
                       style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}
                     >
-                      via {t.refType?.toLowerCase()}
+                      auto
                     </span>
                   )}
                 </td>
               </tr>
             ))}
+
             {!isLoading && !data?.transactions?.length && (
               <tr>
                 <td colSpan={6} className="empty-state">
-                  No entries for this period.
+                  No entries yet. Add your opening balance first.
                 </td>
               </tr>
             )}
@@ -221,7 +276,7 @@ export default function Cashbook() {
       </div>
 
       {editing && (
-        <ManualForm
+        <EntryForm
           entry={editing}
           onClose={() => setEditing(null)}
           queryClient={queryClient}
@@ -231,7 +286,7 @@ export default function Cashbook() {
   );
 }
 
-function ManualForm({ entry, onClose, queryClient }) {
+function EntryForm({ entry, onClose, queryClient }) {
   const isEdit = !!entry.id;
   const [date, setDate] = useState(entry.date || today());
   const [type, setType] = useState(entry.type || "IN");
@@ -260,38 +315,92 @@ function ManualForm({ entry, onClose, queryClient }) {
           <X size={18} />
         </button>
         <div className="modal-title">
-          {isEdit ? "Edit Manual Entry" : "Manual Cash Entry"}
+          {isEdit ? "Edit Entry" : "Add Cash Entry"}
         </div>
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
             mutation.mutate();
           }}
-          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+          style={{ display: "flex", flexDirection: "column", gap: 14 }}
         >
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Date</label>
-              <input
-                type="date"
-                required
-                className="form-input"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Type</label>
-              <select
-                className="form-select"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="IN">Cash In</option>
-                <option value="OUT">Cash Out</option>
-              </select>
+          <div className="form-group">
+            <label className="form-label">Date</label>
+            <input
+              type="date"
+              required
+              className="form-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Type</label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              {[
+                {
+                  v: "IN",
+                  label: "💰 Money Received",
+                  sub: "e.g. opening balance, misc income",
+                },
+                {
+                  v: "OUT",
+                  label: "💸 Money Spent",
+                  sub: "e.g. misc expense, correction",
+                },
+              ].map((opt) => (
+                <label
+                  key={opt.v}
+                  style={{
+                    border: `2px solid ${
+                      type === opt.v ? "var(--rust)" : "var(--border)"
+                    }`,
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    background:
+                      type === opt.v ? "var(--rust-bg)" : "var(--bg-input)",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="type"
+                    value={opt.v}
+                    checked={type === opt.v}
+                    onChange={() => setType(opt.v)}
+                    style={{ display: "none" }}
+                  />
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                      color: "var(--text)",
+                    }}
+                  >
+                    {opt.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "var(--text-dim)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {opt.sub}
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
+
           <div className="form-group">
             <label className="form-label">Amount (₹)</label>
             <input
@@ -300,8 +409,10 @@ function ManualForm({ entry, onClose, queryClient }) {
               className="form-input"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
             />
           </div>
+
           <div className="form-group">
             <label className="form-label">Description</label>
             <input
@@ -309,11 +420,13 @@ function ManualForm({ entry, onClose, queryClient }) {
               className="form-input"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Opening Balance Jan 2024"
             />
           </div>
+
           <div className="modal-actions">
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving…" : "Save"}
+              {mutation.isPending ? "Saving…" : "Save Entry"}
             </Button>
           </div>
         </form>
