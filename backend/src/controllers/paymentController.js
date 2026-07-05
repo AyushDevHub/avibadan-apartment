@@ -1,5 +1,5 @@
 const prisma = require("../config/prisma");
-const { rebuildCashBalances, recalcBillStatus } = require("../utils/ledger");
+const { rebuildCashBalances, syncBillStatuses } = require("../utils/ledger");
 
 async function nextReceiptNumber() {
   const count = await prisma.payment.count();
@@ -7,6 +7,7 @@ async function nextReceiptNumber() {
   return `AV/${year}/${String(count + 1).padStart(4, "0")}`;
 }
 
+// Always rebuild after appending so running balance is always correct
 async function appendCashTransaction({
   date,
   type,
@@ -16,13 +17,24 @@ async function appendCashTransaction({
   refId,
 }) {
   const last = await prisma.cashTransaction.findFirst({
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
   const lastBalance = last ? last.balance : 0;
   const balance = type === "IN" ? lastBalance + amount : lastBalance - amount;
-  return prisma.cashTransaction.create({
-    data: { date, type, amount, balance, description, refType, refId },
+  const tx = await prisma.cashTransaction.create({
+    data: {
+      date,
+      type,
+      amount,
+      balance,
+      description,
+      refType: refType || "MANUAL",
+      refId: refId || null,
+    },
   });
+  // Rebuild every time — fixes same-date ordering issues
+  await rebuildCashBalances();
+  return tx;
 }
 
 async function listPayments(req, res) {
@@ -44,15 +56,12 @@ async function listPayments(req, res) {
   res.json(payments);
 }
 
-// Receive a payment from a flat. If mode === ADJUSTMENT, no cash actually moves
-// (e.g. a flat owner's dues waived against work they did, or a contribution).
 async function createPayment(req, res) {
   const { flatId, billId, amount, date, mode, note } = req.body;
-  if (!flatId || amount == null || !date) {
+  if (!flatId || amount == null || !date)
     return res
       .status(400)
       .json({ message: "flatId, amount, date are required" });
-  }
 
   const receiptNo = await nextReceiptNumber();
   const payment = await prisma.payment.create({
@@ -67,18 +76,14 @@ async function createPayment(req, res) {
     },
   });
 
-  if (billId) {
-    await recalcBillStatus(billId);
-  }
+  if (billId) await syncBillStatuses(flatId);
 
   if (mode !== "ADJUSTMENT") {
     await appendCashTransaction({
       date: new Date(date),
       type: "IN",
       amount: Number(amount),
-      description: `Maintenance collection - ${
-        note || "Flat payment"
-      } (${receiptNo})`,
+      description: `Maintenance received — ${note || "payment"} (${receiptNo})`,
       refType: "PAYMENT",
       refId: payment.id,
     });
@@ -100,9 +105,6 @@ async function getPayment(req, res) {
   res.json(payment);
 }
 
-// Deletes a payment recorded by mistake. Reverses its effects: removes the
-// linked Cashbook entry (if it was cash-impacting) and rebuilds the ledger,
-// and recalculates the bill's status now that this payment no longer counts.
 async function deletePayment(req, res) {
   const existing = await prisma.payment.findUnique({
     where: { id: req.params.id },
@@ -119,9 +121,7 @@ async function deletePayment(req, res) {
     await prisma.cashTransaction.delete({ where: { id: linkedTx.id } });
     await rebuildCashBalances();
   }
-  if (existing.billId) {
-    await recalcBillStatus(existing.billId);
-  }
+  if (existing.billId) await syncBillStatuses(existing.flatId);
 
   res.status(204).end();
 }

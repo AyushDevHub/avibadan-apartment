@@ -10,42 +10,46 @@ async function dashboardSummary(req, res) {
   const now = new Date();
   const thisMonth = monthStr(now);
 
-  const [cashTx, bankTx, payments, expenses, flats] = await Promise.all([
-    prisma.cashTransaction.findMany({ orderBy: { date: "desc" }, take: 1 }),
-    prisma.bankTransaction.findMany({ orderBy: { date: "desc" }, take: 1 }),
-    prisma.payment.findMany({ include: { flat: true } }),
-    prisma.expense.findMany({ orderBy: { date: "desc" } }),
-    prisma.flat.findMany(),
-  ]);
+  // Cash in hand = last CashTransaction balance (EXACT SAME as cashbook page)
+  const lastCashTx = await prisma.cashTransaction.findFirst({
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+  const cashInHand = lastCashTx?.balance || 0;
 
-  const cashInHand = cashTx[0]?.balance || 0;
-  const bankBalance = bankTx[0]?.balance || 0;
+  // Bank balance
+  const lastBankTx = await prisma.bankTransaction.findFirst({
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+  const bankBalance = lastBankTx?.balance || 0;
 
-  // Monthly collection = actual cash received this month (not adjustments)
-  const monthlyCollection = payments
+  // This month collection = cash payments received this month
+  const allPayments = await prisma.payment.findMany({
+    include: { flat: true },
+  });
+  const monthlyCollection = allPayments
     .filter((p) => monthStr(p.date) === thisMonth && p.mode !== "ADJUSTMENT")
     .reduce((s, p) => s + p.amount, 0);
 
-  const monthlyExpense = expenses
+  // This month expense
+  const allExpenses = await prisma.expense.findMany();
+  const monthlyExpense = allExpenses
     .filter((e) => monthStr(e.date) === thisMonth)
     .reduce((s, e) => s + e.amount, 0);
 
-  // Total dues - rate-based
+  // Total dues across all flats (rate-based)
+  const flats = await prisma.flat.findMany();
   let totalDue = 0;
   for (const flat of flats) {
     const { totalDue: due } = await getFlatBalance(flat.id);
     totalDue += due;
   }
 
-  // Income vs expense chart - last 12 months
+  // 12-month income vs expense chart
   const months = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(monthStr(d));
   }
-  const allPayments = await prisma.payment.findMany();
-  const allExpenses = await prisma.expense.findMany();
-
   const incomeVsExpense = months.map((m) => ({
     month: m,
     income: allPayments
@@ -56,7 +60,7 @@ async function dashboardSummary(req, res) {
       .reduce((s, e) => s + e.amount, 0),
   }));
 
-  // Activity feed - last 20 items across payments, expenses, bills (sorted by date desc)
+  // Recent activity feed
   const recentPayments = await prisma.payment.findMany({
     include: { flat: true, bill: true },
     orderBy: { date: "desc" },
@@ -67,12 +71,8 @@ async function dashboardSummary(req, res) {
     orderBy: { date: "desc" },
     take: 10,
   });
-  const recentBills = await prisma.maintenanceBill.findMany({
-    include: { flat: true },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
 
+  const API = process.env.VITE_API_URL || "";
   const activity = [
     ...recentPayments.map((p) => ({
       type: "PAYMENT",
@@ -95,15 +95,6 @@ async function dashboardSummary(req, res) {
         e.description +
         (e.paidByFlat ? ` (${e.paidByFlat.flatNumber} contributed)` : ""),
     })),
-    ...recentBills.map((b) => ({
-      type: "BILL",
-      date: b.dueDate,
-      createdAt: b.createdAt,
-      label: `${b.flat.flatNumber} — ₹${b.amount.toLocaleString(
-        "en-IN"
-      )} bill for ${b.month}`,
-      sub: b.status,
-    })),
   ]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 20);
@@ -120,13 +111,16 @@ async function dashboardSummary(req, res) {
 }
 
 async function fundStatus(req, res) {
-  const [cashTx, bankTx] = await Promise.all([
-    prisma.cashTransaction.findFirst({ orderBy: { date: "desc" } }),
-    prisma.bankTransaction.findFirst({ orderBy: { date: "desc" } }),
-  ]);
+  // Same source — guaranteed match with cashbook
+  const lastCashTx = await prisma.cashTransaction.findFirst({
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
+  const lastBankTx = await prisma.bankTransaction.findFirst({
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  });
   res.json({
-    cashInHand: cashTx?.balance || 0,
-    bankBalance: bankTx?.balance || 0,
+    cashInHand: lastCashTx?.balance || 0,
+    bankBalance: lastBankTx?.balance || 0,
   });
 }
 
