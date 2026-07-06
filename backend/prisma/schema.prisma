@@ -101,6 +101,8 @@ model Flat {
   payments              Payment[]
   complaints            Complaint[]
   contributedExpenses   Expense[]
+  isCollector           Boolean              @default(false)
+  memberLedgerEntries   MemberLedgerEntry[]
 }
 
 model MaintenanceBill {
@@ -212,4 +214,16 @@ model Setting {
   id    String @id @default(cuid())
   key   String @unique
   value String
+}
+
+model MemberLedgerEntry {
+  id          String   @id @default(cuid())
+  flatId      String
+  flat        Flat     @relation(fields: [flatId], references: [id])
+  date        DateTime
+  type        String
+  amount      Float
+  description String
+  expenseId   String?
+  createdAt   DateTime @default(now())
 }

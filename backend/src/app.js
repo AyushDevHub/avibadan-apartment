@@ -19,6 +19,7 @@ const dashboardRoutes = require("./routes/dashboard.routes");
 const publicRoutes = require("./routes/public.routes");
 const uploadRoutes = require("./routes/upload.routes");
 const adminRoutes = require("./routes/admin.routes");
+const memberLedgerRoutes = require("./routes/memberLedger.routes");
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/member-ledger", memberLedgerRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

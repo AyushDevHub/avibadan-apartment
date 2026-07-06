@@ -20,6 +20,7 @@ import Notices from "./pages/admin/Notices";
 import Complaints from "./pages/admin/Complaints";
 import Reports from "./pages/admin/Reports";
 import Settings from "./pages/admin/Settings";
+import MemberLedger from "./pages/admin/MemberLedger";
 
 import ResidentDashboard from "./pages/resident/ResidentDashboard";
 import ResidentNotices from "./pages/resident/ResidentNotices";
@@ -149,6 +150,15 @@ export default function App() {
           element={
             <ProtectedRoute adminOnly>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/member-ledger"
+          element={
+            <ProtectedRoute adminOnly>
+              <MemberLedger />
             </ProtectedRoute>
           }
         />

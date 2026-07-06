@@ -40,6 +40,7 @@ const ADMIN_NAV = [
   { to: "/admin/reports", label: "Reports", icon: FileBarChart },
   { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/transparency", label: "Transparency", icon: Eye },
+  { to: "/admin/member-ledger", label: "Member Ledger", icon: Users },
 ];
 
 const RESIDENT_NAV = [
