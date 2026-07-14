@@ -408,6 +408,39 @@ img { display: block; max-width: 100%; }
 .btn-icon:hover { color: var(--rust-light); }
 .btn-danger { background: transparent; color: var(--text-muted); }
 .btn-danger:hover { color: var(--rust-light); }
+.btn-sm { padding: 6px 10px; font-size: 0.78rem; }
+
+/* ── ACTION BAR ── generic wrapping row of buttons/controls, used on cards
+   with several actions so they stack cleanly instead of overflowing on
+   narrow screens ── */
+.action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.action-bar .btn { flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .action-bar .btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+}
+
+/* ── SUMMARY BAR ── small stat row above lists, wraps on mobile ── */
+.summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.summary-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex: 1 1 140px;
+}
+.summary-chip strong { display: block; font-size: 1rem; color: var(--text); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
 
 /* ── FORM ELEMENTS ── */
 .form-group { display: flex; flex-direction: column; gap: 4px; }
@@ -508,6 +541,39 @@ td.empty { color: var(--text-dim); font-style: italic; }
 .modal-close:hover { color: var(--text-white); }
 .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 .modal-actions .btn { flex: 1; justify-content: center; }
+
+/* ── PROGRESS BAR ── used on Special Project cards to show collection % ── */
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--sage-light, #6b9e78);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ── QR CARD ── payment QR code shown to residents ── */
+.qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.qr-card img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 8px;
+}
 
 /* ── NOTICE CARDS ── */
 .notice-list { display: flex; flex-direction: column; gap: 12px; }

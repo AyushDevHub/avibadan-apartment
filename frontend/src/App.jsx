@@ -26,6 +26,7 @@ import SpecialProjects from "./pages/admin/SpecialProjects";
 import ResidentDashboard from "./pages/resident/ResidentDashboard";
 import ResidentNotices from "./pages/resident/ResidentNotices";
 import ResidentComplaints from "./pages/resident/ResidentComplaints";
+import ResidentSpecialProjects from "./pages/resident/ResidentSpecialProjects";
 
 export default function App() {
   return (
@@ -177,6 +178,10 @@ export default function App() {
         <Route path="/resident/dashboard" element={<ResidentDashboard />} />
         <Route path="/resident/notices" element={<ResidentNotices />} />
         <Route path="/resident/complaints" element={<ResidentComplaints />} />
+        <Route
+          path="/resident/special-projects"
+          element={<ResidentSpecialProjects />}
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

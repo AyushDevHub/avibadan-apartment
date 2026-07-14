@@ -1,0 +1,161 @@
+import { useQuery } from "@tanstack/react-query";
+import { HardHat, QrCode } from "lucide-react";
+import api from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
+import { PageHeader, Badge } from "../../components/ui";
+
+const STATUS_TONE = {
+  COLLECTING: "gold",
+  IN_PROGRESS: "rust",
+  COMPLETED: "sage",
+  CLOSED: "muted",
+};
+
+export default function ResidentSpecialProjects() {
+  const { user } = useAuth();
+  const flatId = user?.flat?.id;
+
+  const { data: projects, isLoading } = useQuery({
+    queryKey: ["special-projects"],
+    queryFn: async () => (await api.get("/special-projects")).data,
+  });
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => (await api.get("/settings")).data,
+  });
+
+  const visible = (projects || []).filter((p) => p.status !== "CLOSED" || true);
+
+  return (
+    <div>
+      <PageHeader
+        title="Special Projects"
+        description="One-off society works and your flat's share of each. Scan the QR
+        below to pay directly."
+      />
+
+      {settings?.qrCodeUrl && (
+        <div className="card qr-card" style={{ marginBottom: 20 }}>
+          <QrCode size={16} color="var(--gold-light)" />
+          <div style={{ fontWeight: 600 }}>Pay via QR</div>
+          <img src={settings.qrCodeUrl} alt="Payment QR code" />
+          {settings.qrCodeNote && (
+            <div style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+              {settings.qrCodeNote}
+            </div>
+          )}
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+            After paying, let the admin know so it can be recorded against your
+            flat.
+          </div>
+        </div>
+      )}
+
+      {isLoading && <div className="empty-state">Loading…</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {visible.map((p) => {
+          const myShare = p.shares.find((s) => s.flatId === flatId);
+          const myPaid = p.payments
+            .filter((pay) => pay.flatId === flatId)
+            .reduce((sum, pay) => sum + pay.amount, 0);
+          const myOutstanding = myShare
+            ? Math.max(myShare.dueAmount - myPaid, 0)
+            : null;
+          const pct = p.targetAmount
+            ? Math.min(
+                100,
+                Math.round((p.totalCollected / p.targetAmount) * 100)
+              )
+            : 0;
+
+          return (
+            <div key={p.id} className="card card-body">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 4,
+                }}
+              >
+                <HardHat size={16} color="var(--gold-light)" />
+                <div
+                  style={{
+                    fontFamily: "Fraunces, serif",
+                    fontWeight: 600,
+                    fontSize: "1rem",
+                  }}
+                >
+                  {p.title}
+                </div>
+                <Badge tone={STATUS_TONE[p.status]}>{p.status}</Badge>
+              </div>
+              {p.description && (
+                <p
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "var(--text-muted)",
+                    marginBottom: 10,
+                  }}
+                >
+                  {p.description}
+                </p>
+              )}
+
+              <div className="progress-track" style={{ marginBottom: 6 }}>
+                <div className="progress-fill" style={{ width: `${pct}%` }} />
+              </div>
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  color: "var(--text-muted)",
+                  marginBottom: 14,
+                }}
+              >
+                Society-wide: ₹{p.totalCollected.toLocaleString("en-IN")} of ₹
+                {p.targetAmount.toLocaleString("en-IN")} collected ({pct}%)
+              </div>
+
+              {myShare ? (
+                <div className="summary-bar" style={{ marginBottom: 0 }}>
+                  <div className="summary-chip">
+                    My share
+                    <strong>
+                      ₹{myShare.dueAmount.toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+                  <div className="summary-chip">
+                    I've paid
+                    <strong>₹{myPaid.toLocaleString("en-IN")}</strong>
+                  </div>
+                  <div className="summary-chip">
+                    Outstanding
+                    <strong
+                      style={{
+                        color:
+                          myOutstanding > 0
+                            ? "var(--rust-light)"
+                            : "var(--sage-light)",
+                      }}
+                    >
+                      ₹{myOutstanding.toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+                  Your flat isn't part of this project's split.
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!isLoading && !visible.length && (
+          <div className="empty-state">No special projects yet.</div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -243,6 +243,16 @@ enum ProjectStatus {
 // funded by a special one-time collection, split per flat by area (sq.ft),
 // kept on its own balance sheet separate from the regular maintenance
 // cashbook until it's finished and any leftover is handed back to the pot.
+// Singleton row (id always "singleton") holding society-wide settings such
+// as the admin's payment QR code, shown to residents so they can pay
+// special-project shares (and anything else) directly.
+model AppSettings {
+  id          String   @id @default("singleton")
+  qrCodeUrl   String?
+  qrCodeNote  String?
+  updatedAt   DateTime @updatedAt
+}
+
 model SpecialProject {
   id            String          @id @default(cuid())
   title         String

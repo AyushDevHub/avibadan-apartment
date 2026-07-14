@@ -87,6 +87,85 @@ async function createProject(req, res) {
   res.status(201).json(await withTotals(project));
 }
 
+// ─── edit: title/description always; targetAmount only while still
+// COLLECTING (re-splits shares by the same area proportions so it doesn't
+// clash with money already collected against the old shares) ─────────────
+
+async function updateProject(req, res) {
+  const { id } = req.params;
+  const { title, description, targetAmount } = req.body;
+
+  const existing = await prisma.specialProject.findUnique({
+    where: { id },
+    include: { shares: true },
+  });
+  if (!existing) return res.status(404).json({ message: "Project not found" });
+
+  if (!title) {
+    return res.status(400).json({ message: "Title is required" });
+  }
+
+  const data = { title, description };
+
+  const wantsRetarget =
+    targetAmount !== undefined &&
+    Number(targetAmount) !== existing.targetAmount;
+
+  if (wantsRetarget) {
+    if (existing.status !== "COLLECTING") {
+      return res.status(400).json({
+        message:
+          "Target amount can only be changed while the project is still COLLECTING.",
+      });
+    }
+    const totalSqFt = existing.shares.reduce((s, sh) => s + sh.areaSqFt, 0);
+    data.targetAmount = Number(targetAmount);
+    data.shares = {
+      updateMany: existing.shares.map((sh) => ({
+        where: { id: sh.id },
+        data: {
+          dueAmount:
+            Math.round((sh.areaSqFt / totalSqFt) * Number(targetAmount) * 100) /
+            100,
+        },
+      })),
+    };
+  }
+
+  const project = await prisma.specialProject.update({
+    where: { id },
+    data,
+    include,
+  });
+  res.json(await withTotals(project));
+}
+
+// ─── delete: only while COLLECTING and nothing has been collected/spent
+// yet, to avoid silently destroying real money records ─────────────────────
+
+async function deleteProject(req, res) {
+  const { id } = req.params;
+  const project = await prisma.specialProject.findUnique({
+    where: { id },
+    include: { payments: true, expenses: true },
+  });
+  if (!project) return res.status(404).json({ message: "Project not found" });
+
+  if (project.payments.length || project.expenses.length) {
+    return res.status(400).json({
+      message:
+        "This project already has collections or expenses recorded. Close it instead of deleting, so those records are preserved.",
+    });
+  }
+
+  await prisma.$transaction([
+    prisma.projectShare.deleteMany({ where: { projectId: id } }),
+    prisma.specialProject.delete({ where: { id } }),
+  ]);
+
+  res.json({ ok: true });
+}
+
 async function updateProjectStatus(req, res) {
   const { status } = req.body;
   const valid = ["COLLECTING", "IN_PROGRESS", "COMPLETED", "CLOSED"];
@@ -212,6 +291,8 @@ module.exports = {
   listProjects,
   getProject,
   createProject,
+  updateProject,
+  deleteProject,
   updateProjectStatus,
   addPayment,
   deletePayment,

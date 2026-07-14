@@ -9,6 +9,9 @@ import {
   Paperclip,
   Upload,
   Loader2,
+  Pencil,
+  Search,
+  Download,
 } from "lucide-react";
 import api from "../../api/client";
 import { PageHeader, Badge, Button } from "../../components/ui";
@@ -26,11 +29,32 @@ export default function SpecialProjects() {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ["special-projects"],
     queryFn: async () => (await api.get("/special-projects")).data,
   });
+
+  const filtered = (projects || []).filter((p) => {
+    const matchesSearch = p.title
+      .toLowerCase()
+      .includes(search.trim().toLowerCase());
+    const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totals = (projects || []).reduce(
+    (acc, p) => {
+      acc.target += p.targetAmount;
+      acc.collected += p.totalCollected;
+      acc.spent += p.totalSpent;
+      acc.balance += p.balance;
+      return acc;
+    },
+    { target: 0, collected: 0, spent: 0, balance: 0 }
+  );
 
   return (
     <div>
@@ -47,9 +71,72 @@ export default function SpecialProjects() {
         }
       />
 
+      {!!projects?.length && (
+        <div className="summary-bar">
+          <div className="summary-chip">
+            Total target
+            <strong>₹{totals.target.toLocaleString("en-IN")}</strong>
+          </div>
+          <div className="summary-chip">
+            Total collected
+            <strong>₹{totals.collected.toLocaleString("en-IN")}</strong>
+          </div>
+          <div className="summary-chip">
+            Total spent
+            <strong>₹{totals.spent.toLocaleString("en-IN")}</strong>
+          </div>
+          <div className="summary-chip">
+            Combined fund balance
+            <strong>₹{totals.balance.toLocaleString("en-IN")}</strong>
+          </div>
+        </div>
+      )}
+
+      {!!projects?.length && (
+        <div className="filter-bar" style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              position: "relative",
+              flex: 1,
+              minWidth: 160,
+              maxWidth: 280,
+            }}
+          >
+            <Search
+              size={14}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--text-muted)",
+              }}
+            />
+            <input
+              className="form-input"
+              placeholder="Search projects…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ paddingLeft: 30, maxWidth: "none" }}
+            />
+          </div>
+          <select
+            className="form-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">All statuses</option>
+            <option value="COLLECTING">Collecting</option>
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+        </div>
+      )}
+
       {isLoading && <div className="empty-state">Loading…</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {projects?.map((p) => (
+        {filtered.map((p) => (
           <ProjectCard
             key={p.id}
             project={p}
@@ -65,6 +152,11 @@ export default function SpecialProjects() {
             sure areas are set on Residents first.
           </div>
         )}
+        {!isLoading && !!projects?.length && !filtered.length && (
+          <div className="empty-state">
+            No projects match your search/filter.
+          </div>
+        )}
       </div>
 
       {showCreate && (
@@ -77,17 +169,54 @@ export default function SpecialProjects() {
   );
 }
 
+function exportSharesCSV(p) {
+  const rows = [
+    ["Flat", "Owner", "Area (sq.ft)", "Due Share", "Paid", "Outstanding"],
+  ];
+  p.shares.forEach((s) => {
+    const paid = p.payments
+      .filter((pay) => pay.flatId === s.flatId)
+      .reduce((sum, pay) => sum + pay.amount, 0);
+    const outstanding = Math.max(s.dueAmount - paid, 0);
+    rows.push([
+      s.flat.flatNumber,
+      s.flat.ownerName,
+      s.areaSqFt,
+      s.dueAmount,
+      paid,
+      outstanding,
+    ]);
+  });
+  const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${p.title.replace(/[^a-z0-9]+/gi, "_")}_shares.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
   const [tab, setTab] = useState("shares");
   const [showPayment, setShowPayment] = useState(false);
   const [showExpense, setShowExpense] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const statusMutation = useMutation({
     mutationFn: (status) =>
       api.patch(`/special-projects/${p.id}/status`, { status }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["special-projects"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/special-projects/${p.id}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["special-projects"] }),
+    onError: (err) =>
+      alert(err.response?.data?.message || "Could not delete project"),
   });
 
   const pct = p.targetAmount
@@ -99,16 +228,17 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
       <div
         style={{
           padding: "16px 20px",
-          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 12,
         }}
-        onClick={onToggle}
       >
-        <div>
+        <div
+          style={{ cursor: "pointer", flex: "1 1 220px", minWidth: 0 }}
+          onClick={onToggle}
+        >
           <div
             style={{
               fontFamily: "Fraunces, serif",
@@ -117,6 +247,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
               display: "flex",
               alignItems: "center",
               gap: 8,
+              flexWrap: "wrap",
             }}
           >
             {p.title}
@@ -128,20 +259,46 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
             {p.totalSpent.toLocaleString("en-IN")} · Fund balance{" "}
             <strong>₹{p.balance.toLocaleString("en-IN")}</strong>
           </div>
+          <div className="progress-track" style={{ marginTop: 8 }}>
+            <div className="progress-fill" style={{ width: `${pct}%` }} />
+          </div>
         </div>
-        {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <button
+            className="btn-icon"
+            title="Edit project"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEdit(true);
+            }}
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            className="btn-icon"
+            title="Delete project"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (
+                confirm(
+                  `Delete "${p.title}"? This only works if it has no collections or expenses yet.`
+                )
+              ) {
+                deleteMutation.mutate();
+              }
+            }}
+          >
+            <Trash2 size={16} />
+          </button>
+          <button className="btn-icon" onClick={onToggle} title="Expand">
+            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+        </div>
       </div>
 
       {expanded && (
         <div style={{ padding: "0 20px 20px" }}>
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 14,
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="action-bar" style={{ marginBottom: 14 }}>
             <Button size="sm" onClick={() => setShowPayment(true)}>
               <Plus size={13} /> Record Collection
             </Button>
@@ -179,6 +336,13 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
                 Close &amp; Return Unused Budget
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportSharesCSV(p)}
+            >
+              <Download size={13} /> Export Shares CSV
+            </Button>
           </div>
 
           <div
@@ -187,6 +351,8 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
               gap: 16,
               marginBottom: 12,
               fontSize: "0.82rem",
+              flexWrap: "wrap",
+              overflowX: "auto",
             }}
           >
             <button
@@ -197,6 +363,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
                 border: "none",
                 cursor: "pointer",
                 fontWeight: tab === "shares" ? 700 : 400,
+                whiteSpace: "nowrap",
               }}
             >
               Per-flat shares
@@ -208,6 +375,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
                 border: "none",
                 cursor: "pointer",
                 fontWeight: tab === "payments" ? 700 : 400,
+                whiteSpace: "nowrap",
               }}
             >
               Collections ({p.payments.length})
@@ -219,6 +387,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
                 border: "none",
                 cursor: "pointer",
                 fontWeight: tab === "expenses" ? 700 : 400,
+                whiteSpace: "nowrap",
               }}
             >
               Expenses ({p.expenses.length})
@@ -226,163 +395,176 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
           </div>
 
           {tab === "shares" && (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Flat</th>
-                  <th>Owner</th>
-                  <th className="right">Area (sq.ft)</th>
-                  <th className="right">Due Share</th>
-                  <th className="right">Paid</th>
-                  <th className="right">Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.shares.map((s) => {
-                  const paid = p.payments
-                    .filter((pay) => pay.flatId === s.flatId)
-                    .reduce((sum, pay) => sum + pay.amount, 0);
-                  const outstanding = Math.max(s.dueAmount - paid, 0);
-                  return (
-                    <tr key={s.id}>
-                      <td>{s.flat.flatNumber}</td>
-                      <td>{s.flat.ownerName}</td>
-                      <td className="right mono">{s.areaSqFt}</td>
-                      <td className="right mono">
-                        ₹{s.dueAmount.toLocaleString("en-IN")}
-                      </td>
-                      <td className="right mono">
-                        ₹{paid.toLocaleString("en-IN")}
-                      </td>
-                      <td
-                        className="right mono"
-                        style={{
-                          color:
-                            outstanding > 0
-                              ? "var(--rust-light)"
-                              : "var(--sage-light)",
-                        }}
-                      >
-                        ₹{outstanding.toLocaleString("en-IN")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Flat</th>
+                    <th>Owner</th>
+                    <th className="right">Area (sq.ft)</th>
+                    <th className="right">Due Share</th>
+                    <th className="right">Paid</th>
+                    <th className="right">Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.shares.map((s) => {
+                    const paid = p.payments
+                      .filter((pay) => pay.flatId === s.flatId)
+                      .reduce((sum, pay) => sum + pay.amount, 0);
+                    const outstanding = Math.max(s.dueAmount - paid, 0);
+                    return (
+                      <tr key={s.id}>
+                        <td>{s.flat.flatNumber}</td>
+                        <td>{s.flat.ownerName}</td>
+                        <td className="right mono">{s.areaSqFt}</td>
+                        <td className="right mono">
+                          ₹{s.dueAmount.toLocaleString("en-IN")}
+                        </td>
+                        <td className="right mono">
+                          ₹{paid.toLocaleString("en-IN")}
+                        </td>
+                        <td
+                          className="right mono"
+                          style={{
+                            color:
+                              outstanding > 0
+                                ? "var(--rust-light)"
+                                : "var(--sage-light)",
+                          }}
+                        >
+                          ₹{outstanding.toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {tab === "payments" && (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Flat</th>
-                  <th>Note</th>
-                  <th className="right">Amount</th>
-                  <th className="right"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.payments.map((pay) => (
-                  <tr key={pay.id}>
-                    <td>{new Date(pay.date).toLocaleDateString("en-IN")}</td>
-                    <td>
-                      {pay.flat.flatNumber} — {pay.flat.ownerName}
-                    </td>
-                    <td style={{ fontSize: "0.82rem" }}>{pay.note}</td>
-                    <td className="right mono">
-                      ₹{pay.amount.toLocaleString("en-IN")}
-                    </td>
-                    <td className="right">
-                      <DeleteBtn
-                        onDelete={() =>
-                          api.delete(
-                            `/special-projects/${p.id}/payments/${pay.id}`
-                          )
-                        }
-                        queryClient={queryClient}
-                      />
-                    </td>
-                  </tr>
-                ))}
-                {!p.payments.length && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="empty-state">
-                      No collections logged yet.
-                    </td>
+                    <th>Date</th>
+                    <th>Flat</th>
+                    <th>Note</th>
+                    <th className="right">Amount</th>
+                    <th className="right"></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {p.payments.map((pay) => (
+                    <tr key={pay.id}>
+                      <td>{new Date(pay.date).toLocaleDateString("en-IN")}</td>
+                      <td>
+                        {pay.flat.flatNumber} — {pay.flat.ownerName}
+                      </td>
+                      <td style={{ fontSize: "0.82rem" }}>{pay.note}</td>
+                      <td className="right mono">
+                        ₹{pay.amount.toLocaleString("en-IN")}
+                      </td>
+                      <td className="right">
+                        <DeleteBtn
+                          onDelete={() =>
+                            api.delete(
+                              `/special-projects/${p.id}/payments/${pay.id}`
+                            )
+                          }
+                          queryClient={queryClient}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {!p.payments.length && (
+                    <tr>
+                      <td colSpan={5} className="empty-state">
+                        No collections logged yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {tab === "expenses" && (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Bill</th>
-                  <th className="right">Amount</th>
-                  <th className="right"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.expenses.map((ex) => (
-                  <tr key={ex.id}>
-                    <td>{new Date(ex.date).toLocaleDateString("en-IN")}</td>
-                    <td style={{ fontSize: "0.82rem" }}>{ex.description}</td>
-                    <td>
-                      {ex.billUpload ? (
-                        <a
-                          href={ex.billUpload}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="receipt-link"
-                        >
-                          <Paperclip size={13} />
-                          View
-                        </a>
-                      ) : (
-                        <span
-                          style={{
-                            color: "var(--text-muted)",
-                            fontSize: "0.78rem",
-                          }}
-                        >
-                          —
-                        </span>
-                      )}
-                    </td>
-                    <td className="right mono">
-                      ₹{ex.amount.toLocaleString("en-IN")}
-                    </td>
-                    <td className="right">
-                      <DeleteBtn
-                        onDelete={() =>
-                          api.delete(
-                            `/special-projects/${p.id}/expenses/${ex.id}`
-                          )
-                        }
-                        queryClient={queryClient}
-                      />
-                    </td>
-                  </tr>
-                ))}
-                {!p.expenses.length && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="empty-state">
-                      No expenses logged yet.
-                    </td>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Bill</th>
+                    <th className="right">Amount</th>
+                    <th className="right"></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {p.expenses.map((ex) => (
+                    <tr key={ex.id}>
+                      <td>{new Date(ex.date).toLocaleDateString("en-IN")}</td>
+                      <td style={{ fontSize: "0.82rem" }}>{ex.description}</td>
+                      <td>
+                        {ex.billUpload ? (
+                          <a
+                            href={ex.billUpload}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="receipt-link"
+                          >
+                            <Paperclip size={13} />
+                            View
+                          </a>
+                        ) : (
+                          <span
+                            style={{
+                              color: "var(--text-muted)",
+                              fontSize: "0.78rem",
+                            }}
+                          >
+                            —
+                          </span>
+                        )}
+                      </td>
+                      <td className="right mono">
+                        ₹{ex.amount.toLocaleString("en-IN")}
+                      </td>
+                      <td className="right">
+                        <DeleteBtn
+                          onDelete={() =>
+                            api.delete(
+                              `/special-projects/${p.id}/expenses/${ex.id}`
+                            )
+                          }
+                          queryClient={queryClient}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {!p.expenses.length && (
+                    <tr>
+                      <td colSpan={5} className="empty-state">
+                        No expenses logged yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
 
+      {showEdit && (
+        <EditProjectModal
+          project={p}
+          onClose={() => setShowEdit(false)}
+          queryClient={queryClient}
+        />
+      )}
       {showPayment && (
         <PaymentModal
           project={p}
@@ -493,6 +675,95 @@ function CreateProjectModal({ onClose, queryClient }) {
           <div className="modal-actions">
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? "Creating…" : "Create Project"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditProjectModal({ project, onClose, queryClient }) {
+  const [title, setTitle] = useState(project.title);
+  const [description, setDescription] = useState(project.description || "");
+  const [targetAmount, setTargetAmount] = useState(project.targetAmount);
+
+  const canRetarget = project.status === "COLLECTING";
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.patch(`/special-projects/${project.id}`, {
+        title,
+        description,
+        targetAmount: canRetarget ? Number(targetAmount) : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["special-projects"] });
+      onClose();
+    },
+    onError: (err) =>
+      alert(err.response?.data?.message || "Could not update project"),
+  });
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <button className="modal-close" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="modal-title">Edit Project</div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            mutation.mutate();
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          <div className="form-group">
+            <label className="form-label">Title</label>
+            <input
+              required
+              className="form-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Description (optional)</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Target Amount (₹)</label>
+            <input
+              required
+              type="number"
+              className="form-input"
+              value={targetAmount}
+              disabled={!canRetarget}
+              onChange={(e) => setTargetAmount(e.target.value)}
+            />
+            {!canRetarget && (
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  marginTop: 4,
+                }}
+              >
+                Target amount can only be changed while the project is still
+                COLLECTING (per-flat shares are re-split automatically when you
+                change it).
+              </div>
+            )}
+          </div>
+          <div className="modal-actions">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </div>
         </form>

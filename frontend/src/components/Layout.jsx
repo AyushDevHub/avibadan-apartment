@@ -47,6 +47,11 @@ const ADMIN_NAV = [
 
 const RESIDENT_NAV = [
   { to: "/resident/dashboard", label: "My Dues", icon: LayoutDashboard },
+  {
+    to: "/resident/special-projects",
+    label: "Special Projects",
+    icon: HardHat,
+  },
   { to: "/resident/notices", label: "Notices", icon: Megaphone },
   { to: "/resident/complaints", label: "Complaints", icon: MessageSquare },
   { to: "/transparency", label: "Transparency", icon: Eye },
@@ -62,9 +67,9 @@ const ADMIN_BOTTOM = [
 ];
 const RESIDENT_BOTTOM = [
   { to: "/resident/dashboard", label: "My Dues", icon: LayoutDashboard },
+  { to: "/resident/special-projects", label: "Projects", icon: HardHat },
   { to: "/resident/notices", label: "Notices", icon: Megaphone },
   { to: "/resident/complaints", label: "Issues", icon: MessageSquare },
-  { to: "/transparency", label: "Finances", icon: Eye },
 ];
 
 export default function Layout() {

@@ -21,6 +21,7 @@ const uploadRoutes = require("./routes/upload.routes");
 const adminRoutes = require("./routes/admin.routes");
 const memberLedgerRoutes = require("./routes/memberLedger.routes");
 const specialProjectRoutes = require("./routes/specialProject.routes");
+const settingsRoutes = require("./routes/settings.routes");
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/member-ledger", memberLedgerRoutes);
 app.use("/api/special-projects", specialProjectRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

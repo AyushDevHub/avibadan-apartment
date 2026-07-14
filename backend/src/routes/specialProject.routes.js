@@ -10,6 +10,8 @@ router.get("/:id", authRequired, ctrl.getProject);
 
 // Only admin can manage projects
 router.post("/", authRequired, adminOnly, ctrl.createProject);
+router.patch("/:id", authRequired, adminOnly, ctrl.updateProject);
+router.delete("/:id", authRequired, adminOnly, ctrl.deleteProject);
 router.patch("/:id/status", authRequired, adminOnly, ctrl.updateProjectStatus);
 router.post("/:id/close", authRequired, adminOnly, ctrl.closeProject);
 
