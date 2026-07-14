@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { HardHat, QrCode } from "lucide-react";
+import { HardHat, QrCode, Paperclip } from "lucide-react";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { PageHeader, Badge } from "../../components/ui";
@@ -111,11 +111,25 @@ export default function ResidentSpecialProjects() {
                 style={{
                   fontSize: "0.78rem",
                   color: "var(--text-muted)",
-                  marginBottom: 14,
+                  marginBottom: 10,
                 }}
               >
                 Society-wide: ₹{p.totalCollected.toLocaleString("en-IN")} of ₹
                 {p.targetAmount.toLocaleString("en-IN")} collected ({pct}%)
+              </div>
+              <div className="summary-bar" style={{ marginBottom: 14 }}>
+                <div className="summary-chip">
+                  Total collected
+                  <strong>₹{p.totalCollected.toLocaleString("en-IN")}</strong>
+                </div>
+                <div className="summary-chip">
+                  Total spent
+                  <strong>₹{p.totalSpent.toLocaleString("en-IN")}</strong>
+                </div>
+                <div className="summary-chip">
+                  Fund balance
+                  <strong>₹{p.balance.toLocaleString("en-IN")}</strong>
+                </div>
               </div>
 
               {myShare ? (
@@ -178,6 +192,70 @@ export default function ResidentSpecialProjects() {
               ) : (
                 <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
                   Your flat isn't part of this project's split.
+                </div>
+              )}
+
+              {!!p.expenses?.length && (
+                <div style={{ marginTop: 16 }}>
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Expenses ({p.expenses.length}) — spent so far ₹
+                    {p.totalSpent.toLocaleString("en-IN")}
+                  </div>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th>Bill</th>
+                          <th className="right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {p.expenses.map((ex) => (
+                          <tr key={ex.id}>
+                            <td>
+                              {new Date(ex.date).toLocaleDateString("en-IN")}
+                            </td>
+                            <td style={{ fontSize: "0.82rem" }}>
+                              {ex.description}
+                            </td>
+                            <td>
+                              {ex.billUpload ? (
+                                <a
+                                  href={ex.billUpload}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="receipt-link"
+                                >
+                                  <Paperclip size={13} />
+                                  View
+                                </a>
+                              ) : (
+                                <span
+                                  style={{
+                                    color: "var(--text-muted)",
+                                    fontSize: "0.78rem",
+                                  }}
+                                >
+                                  —
+                                </span>
+                              )}
+                            </td>
+                            <td className="right mono">
+                              ₹{ex.amount.toLocaleString("en-IN")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
