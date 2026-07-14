@@ -257,30 +257,6 @@ export default function Residents() {
                   {saveMutation.isPending ? "Saving…" : "Save"}
                 </Button>
               </div>
-              <div className="form-group">
-                <label className="form-label">Collector Member</label>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={!!form.isCollector}
-                    onChange={(e) =>
-                      setForm({ ...form, isCollector: e.target.checked })
-                    }
-                  />
-                  <span
-                    style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}
-                  >
-                    This member collects/spends on behalf of society
-                  </span>
-                </label>
-              </div>
             </form>
           </div>
         </div>

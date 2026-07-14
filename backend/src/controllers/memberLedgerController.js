@@ -39,15 +39,17 @@ async function getMemberLedger(req, res) {
   });
 }
 
-// List all collector members and their current net balance
+// List every flat that has ever contributed/spent on the society's behalf,
+// with their current net balance. There is no fixed "collector" — anyone
+// who has at least one ledger entry shows up here automatically.
 async function getAllMemberLedgers(req, res) {
-  const collectors = await prisma.flat.findMany({
-    where: { isCollector: true },
+  const contributors = await prisma.flat.findMany({
+    where: { memberLedgerEntries: { some: {} } },
     orderBy: { flatNumber: "asc" },
   });
 
   const result = await Promise.all(
-    collectors.map(async (flat) => {
+    contributors.map(async (flat) => {
       const entries = await prisma.memberLedgerEntry.findMany({
         where: { flatId: flat.id },
       });
@@ -87,10 +89,8 @@ async function addEntry(req, res) {
 
   const flat = await prisma.flat.findUnique({ where: { id: flatId } });
   if (!flat) return res.status(404).json({ message: "Flat not found" });
-  if (!flat.isCollector)
-    return res
-      .status(400)
-      .json({ message: "This flat is not a collector member" });
+  // No fixed "collector" role — any resident can top up cash or spend on
+  // the society's behalf whenever they choose to, so no isCollector gate here.
 
   let expenseId = null;
 

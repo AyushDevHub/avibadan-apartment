@@ -48,6 +48,13 @@ export default function MemberLedger() {
     queryFn: async () => (await api.get("/member-ledger")).data,
   });
 
+  // All flats, so ANY resident can be picked when adding an entry —
+  // there's no fixed "collector" role.
+  const { data: allFlats } = useQuery({
+    queryKey: ["flats"],
+    queryFn: async () => (await api.get("/flats")).data,
+  });
+
   const { data: detail } = useQuery({
     queryKey: ["member-ledger", expanded],
     queryFn: async () => (await api.get(`/member-ledger/${expanded}`)).data,
@@ -63,7 +70,7 @@ export default function MemberLedger() {
     <div>
       <PageHeader
         title="Member Ledger"
-        description="What each collector-member has spent from pocket vs what the society owes them."
+        description="What each resident has topped up or spent from pocket on the society's behalf, vs what the society owes them back."
         action={
           <Button
             onClick={() => {
@@ -326,15 +333,16 @@ export default function MemberLedger() {
 
         {!isLoading && !collectors?.length && (
           <div className="empty-state">
-            No collector members found. Go to Residents → Edit a flat → turn on
-            "Is Collector Member".
+            No entries yet. Click "Add Entry" and pick any resident — anyone who
+            tops up cash or spends on the society's behalf will show up here
+            automatically.
           </div>
         )}
       </div>
 
       {showForm && (
         <AddEntryModal
-          collectors={collectors}
+          collectors={allFlats}
           prefillFlatId={prefillFlat}
           onClose={() => {
             setShowForm(false);
@@ -417,14 +425,14 @@ function AddEntryModal({
           style={{ display: "flex", flexDirection: "column", gap: 12 }}
         >
           <div className="form-group">
-            <label className="form-label">Collector Member</label>
+            <label className="form-label">Resident</label>
             <select
               required
               className="form-select"
               value={flatId}
               onChange={(e) => setFlatId(e.target.value)}
             >
-              <option value="">Select member</option>
+              <option value="">Select resident</option>
               {collectors?.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.flatNumber} — {c.ownerName}

@@ -59,6 +59,7 @@ async function createFlat(req, res) {
     monthlyRate,
     status,
     maintenanceStartMonth,
+    isCollector,
   } = req.body;
   if (!flatNumber || !ownerName || monthlyRate == null) {
     return res
@@ -74,6 +75,7 @@ async function createFlat(req, res) {
       monthlyRate: Number(monthlyRate),
       status: status || "ACTIVE",
       maintenanceStartMonth: maintenanceStartMonth || null,
+      isCollector: !!isCollector,
     },
   });
   res.status(201).json(flat);
@@ -88,6 +90,7 @@ async function updateFlat(req, res) {
     monthlyRate,
     status,
     maintenanceStartMonth,
+    isCollector,
   } = req.body;
   const flat = await prisma.flat.update({
     where: { id: req.params.id },
@@ -99,6 +102,7 @@ async function updateFlat(req, res) {
       ...(monthlyRate !== undefined && { monthlyRate: Number(monthlyRate) }),
       ...(status !== undefined && { status }),
       ...(maintenanceStartMonth !== undefined && { maintenanceStartMonth }),
+      ...(isCollector !== undefined && { isCollector: !!isCollector }),
     },
   });
   res.json(flat);
