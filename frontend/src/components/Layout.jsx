@@ -18,6 +18,7 @@ import {
   Building2,
   Menu,
   X,
+  HardHat,
   Sun,
   Moon,
   Settings,
@@ -41,6 +42,7 @@ const ADMIN_NAV = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/transparency", label: "Transparency", icon: Eye },
   { to: "/admin/member-ledger", label: "Member Ledger", icon: Users },
+  { to: "/admin/special-projects", label: "Special Projects", icon: HardHat },
 ];
 
 const RESIDENT_NAV = [
