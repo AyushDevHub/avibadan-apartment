@@ -11,6 +11,7 @@ const EMPTY = {
   phone: "",
   email: "",
   monthlyRate: "",
+  areaSqFt: "",
   maintenanceStartMonth: "",
   status: "ACTIVE",
 };
@@ -160,6 +161,7 @@ export default function Residents() {
                 saveMutation.mutate({
                   ...form,
                   monthlyRate: Number(form.monthlyRate),
+                  areaSqFt: form.areaSqFt ? Number(form.areaSqFt) : null,
                 });
               }}
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -188,6 +190,19 @@ export default function Residents() {
                     }
                   />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Area (sq.ft) — used to split special project funds
+                </label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={form.areaSqFt}
+                  onChange={(e) =>
+                    setForm({ ...form, areaSqFt: e.target.value })
+                  }
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Owner Name</label>

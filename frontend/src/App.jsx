@@ -21,6 +21,7 @@ import Complaints from "./pages/admin/Complaints";
 import Reports from "./pages/admin/Reports";
 import Settings from "./pages/admin/Settings";
 import MemberLedger from "./pages/admin/MemberLedger";
+import SpecialProjects from "./pages/admin/SpecialProjects";
 
 import ResidentDashboard from "./pages/resident/ResidentDashboard";
 import ResidentNotices from "./pages/resident/ResidentNotices";
@@ -159,6 +160,15 @@ export default function App() {
           element={
             <ProtectedRoute adminOnly>
               <MemberLedger />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/special-projects"
+          element={
+            <ProtectedRoute adminOnly>
+              <SpecialProjects />
             </ProtectedRoute>
           }
         />

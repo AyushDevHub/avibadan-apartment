@@ -93,6 +93,7 @@ model Flat {
   phone                 String?
   email                 String?
   monthlyRate           Float
+  areaSqFt              Float?
   maintenanceStartMonth String?
   status                FlatStatus        @default(ACTIVE)
   createdAt             DateTime          @default(now())
@@ -103,6 +104,8 @@ model Flat {
   contributedExpenses   Expense[]
   isCollector           Boolean              @default(false)
   memberLedgerEntries   MemberLedgerEntry[]
+  projectShares         ProjectShare[]
+  projectPayments       ProjectPayment[]
 }
 
 model MaintenanceBill {
@@ -226,4 +229,72 @@ model MemberLedgerEntry {
   description String
   expenseId   String?
   createdAt   DateTime @default(now())
+}
+
+enum ProjectStatus {
+  COLLECTING   // gathering funds from residents, not yet spending
+  IN_PROGRESS  // work started, expenses being logged
+  COMPLETED    // work finished, leftover budget still sitting in project
+  CLOSED       // leftover budget swept into main cashbook, project archived
+}
+
+// A big one-off project (repainting, waterproofing, lift overhaul, etc.)
+// funded by a special one-time collection, split per flat by area (sq.ft),
+// kept on its own balance sheet separate from the regular maintenance
+// cashbook until it's finished and any leftover is handed back to the pot.
+model SpecialProject {
+  id            String          @id @default(cuid())
+  title         String
+  description   String?
+  targetAmount  Float
+  status        ProjectStatus   @default(COLLECTING)
+  createdAt     DateTime        @default(now())
+  closedAt      DateTime?
+  closingNote   String?
+  shares        ProjectShare[]
+  payments      ProjectPayment[]
+  expenses      ProjectExpense[]
+}
+
+// Each flat's calculated share of a project, frozen at creation time from
+// that flat's areaSqFt ÷ total society sqft × targetAmount — so it doesn't
+// shift under people mid-collection even if flats/areas change later.
+model ProjectShare {
+  id         String         @id @default(cuid())
+  projectId  String
+  project    SpecialProject @relation(fields: [projectId], references: [id])
+  flatId     String
+  flat       Flat           @relation(fields: [flatId], references: [id])
+  areaSqFt   Float
+  dueAmount  Float
+
+  @@unique([projectId, flatId])
+}
+
+// Money a resident actually pays in toward a project's collection.
+model ProjectPayment {
+  id         String         @id @default(cuid())
+  projectId  String
+  project    SpecialProject @relation(fields: [projectId], references: [id])
+  flatId     String
+  flat       Flat           @relation(fields: [flatId], references: [id])
+  amount     Float
+  date       DateTime
+  mode       PaymentMode    @default(CASH)
+  note       String?
+  receiptNo  String?        @unique
+  createdAt  DateTime       @default(now())
+}
+
+// Money spent out of the project's own fund (painter, contractor, etc.)
+// This never touches the main cashbook — it's the project's own ledger.
+model ProjectExpense {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     SpecialProject @relation(fields: [projectId], references: [id])
+  amount      Float
+  date        DateTime
+  description String
+  billUpload  String?
+  createdAt   DateTime       @default(now())
 }
