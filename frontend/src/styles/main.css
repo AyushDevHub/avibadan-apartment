@@ -384,6 +384,7 @@ img { display: block; max-width: 100%; }
 .badge-rust  { background: var(--rust-bg);  color: var(--rust-light); }
 .badge-gold  { background: var(--gold-bg);  color: var(--gold-light); }
 .badge-ink   { background: var(--ink-bg);   color: var(--ink); }
+.badge-muted { background: var(--bg-hover); color: var(--text-muted); }
 
 /* ── BUTTONS ── */
 .btn {

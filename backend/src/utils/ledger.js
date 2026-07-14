@@ -77,7 +77,31 @@ async function getFlatBalance(flatId) {
   // Only calculate up to current month (never charge for future months).
   const numMonths =
     startMonth > nowMonth ? 0 : countMonths(startMonth, nowMonth);
-  const totalExpected = numMonths * flat.monthlyRate;
+  const totalExpectedRaw = numMonths * flat.monthlyRate;
+
+  // Waived bills (e.g. adjusted against future work, or a vacant/under-
+  // renovation flat) should no longer count toward what's "expected" —
+  // otherwise Dues/credit stayed wrong even after an admin explicitly
+  // waived a bill, since this rate-based total previously ignored bill
+  // status entirely. Only the still-unpaid remainder of a waived bill is
+  // forgiven — if part of it was already paid before waiving, that
+  // payment is (correctly) still counted in totalPaid below, so we must
+  // not also forgive it here or the flat would be double-credited.
+  const waivedBills = await prisma.maintenanceBill.findMany({
+    where: { flatId, status: "WAIVED" },
+    select: { id: true, amount: true },
+  });
+  let waivedAmount = 0;
+  for (const bill of waivedBills) {
+    const paidAgg = await prisma.payment.aggregate({
+      where: { billId: bill.id },
+      _sum: { amount: true },
+    });
+    const paidOnBill = paidAgg._sum.amount || 0;
+    waivedAmount += Math.max(bill.amount - paidOnBill, 0);
+  }
+
+  const totalExpected = Math.max(totalExpectedRaw - waivedAmount, 0);
 
   const agg = await prisma.payment.aggregate({
     where: { flatId },
