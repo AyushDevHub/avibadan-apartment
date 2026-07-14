@@ -145,20 +145,26 @@ async function updateProject(req, res) {
 
 async function deleteProject(req, res) {
   const { id } = req.params;
+  const force = req.query.force === "true" || req.body?.force === true;
+
   const project = await prisma.specialProject.findUnique({
     where: { id },
     include: { payments: true, expenses: true },
   });
   if (!project) return res.status(404).json({ message: "Project not found" });
 
-  if (project.payments.length || project.expenses.length) {
+  const hasMoney = project.payments.length || project.expenses.length;
+
+  if (hasMoney && !force) {
     return res.status(400).json({
       message:
-        "This project already has collections or expenses recorded. Close it instead of deleting, so those records are preserved.",
+        "This project already has collections or expenses recorded. Close it instead of deleting, so those records are preserved — or confirm force delete to permanently remove everything.",
     });
   }
 
   await prisma.$transaction([
+    prisma.projectPayment.deleteMany({ where: { projectId: id } }),
+    prisma.projectExpense.deleteMany({ where: { projectId: id } }),
     prisma.projectShare.deleteMany({ where: { projectId: id } }),
     prisma.specialProject.delete({ where: { id } }),
   ]);

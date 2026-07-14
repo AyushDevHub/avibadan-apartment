@@ -217,6 +217,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
   const [showExpense, setShowExpense] = useState(false);
   const [showClose, setShowClose] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const statusMutation = useMutation({
     mutationFn: (status) =>
@@ -226,9 +227,12 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.delete(`/special-projects/${p.id}`),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["special-projects"] }),
+    mutationFn: (force) =>
+      api.delete(`/special-projects/${p.id}`, { params: { force } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["special-projects"] });
+      setShowDeleteModal(false);
+    },
     onError: (err) =>
       alert(err.response?.data?.message || "Could not delete project"),
   });
@@ -293,13 +297,7 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
             title="Delete project"
             onClick={(e) => {
               e.stopPropagation();
-              if (
-                confirm(
-                  `Delete "${p.title}"? This only works if it has no collections or expenses yet.`
-                )
-              ) {
-                deleteMutation.mutate();
-              }
+              setShowDeleteModal(true);
             }}
           >
             <Trash2 size={16} />
@@ -630,6 +628,104 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
           queryClient={queryClient}
         />
       )}
+      {showDeleteModal && (
+        <DeleteProjectModal
+          project={p}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={(force) => deleteMutation.mutate(force)}
+          isPending={deleteMutation.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// GitHub-style destructive confirmation: the admin must type the project's
+// exact title before the delete button unlocks. If the project already has
+// collections or expenses, this also permanently deletes all of that
+// project's records (shares, collections, expenses) — it never touches the
+// main cashbook, since project money never flowed through it in the first
+// place.
+function DeleteProjectModal({ project, onClose, onConfirm, isPending }) {
+  const [typed, setTyped] = useState("");
+  const hasMoney = project.payments.length > 0 || project.expenses.length > 0;
+  const matches = typed === project.title;
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <button className="modal-close" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="modal-title" style={{ color: "var(--rust-light)" }}>
+          Delete Project
+        </div>
+
+        {hasMoney ? (
+          <div
+            style={{
+              fontSize: "0.85rem",
+              background: "rgba(200, 80, 60, 0.08)",
+              border: "1px solid var(--rust-light)",
+              borderRadius: 8,
+              padding: "10px 12px",
+              marginBottom: 12,
+            }}
+          >
+            <strong>This project has real money on it:</strong>
+            <div style={{ marginTop: 6 }}>
+              ₹{project.totalCollected.toLocaleString("en-IN")} collected across{" "}
+              {project.payments.length} payment(s), and ₹
+              {project.totalSpent.toLocaleString("en-IN")} spent across{" "}
+              {project.expenses.length} expense(s).
+            </div>
+            <div style={{ marginTop: 6 }}>
+              Deleting will permanently erase all of that — every collection,
+              every expense and bill, every flat's share — with no way to get it
+              back. This does not affect the main cashbook.
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            This will permanently delete "{project.title}" and its per-flat
+            share split. This can't be undone.
+          </p>
+        )}
+
+        <div className="form-group" style={{ marginTop: 4 }}>
+          <label className="form-label">
+            Type <strong>{project.title}</strong> to confirm
+          </label>
+          <input
+            className="form-input"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={project.title}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="modal-actions">
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onConfirm(hasMoney)}
+            disabled={!matches || isPending}
+            style={{
+              background: matches ? "var(--rust-light)" : undefined,
+              opacity: matches ? 1 : 0.5,
+              cursor: matches ? "pointer" : "not-allowed",
+            }}
+          >
+            {isPending
+              ? "Deleting…"
+              : hasMoney
+              ? "I understand, delete everything"
+              : "Delete project"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
