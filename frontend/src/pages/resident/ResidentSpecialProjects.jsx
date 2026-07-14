@@ -119,31 +119,62 @@ export default function ResidentSpecialProjects() {
               </div>
 
               {myShare ? (
-                <div className="summary-bar" style={{ marginBottom: 0 }}>
-                  <div className="summary-chip">
-                    My share
-                    <strong>
-                      ₹{myShare.dueAmount.toLocaleString("en-IN")}
-                    </strong>
+                <>
+                  <div className="summary-bar" style={{ marginBottom: 8 }}>
+                    <div className="summary-chip">
+                      My share
+                      <strong>
+                        ₹{myShare.dueAmount.toLocaleString("en-IN")}
+                      </strong>
+                    </div>
+                    <div className="summary-chip">
+                      I've paid
+                      <strong>₹{myPaid.toLocaleString("en-IN")}</strong>
+                    </div>
+                    <div className="summary-chip">
+                      Outstanding
+                      <strong
+                        style={{
+                          color:
+                            myOutstanding > 0
+                              ? "var(--rust-light)"
+                              : "var(--sage-light)",
+                        }}
+                      >
+                        ₹{myOutstanding.toLocaleString("en-IN")}
+                      </strong>
+                    </div>
                   </div>
-                  <div className="summary-chip">
-                    I've paid
-                    <strong>₹{myPaid.toLocaleString("en-IN")}</strong>
-                  </div>
-                  <div className="summary-chip">
-                    Outstanding
-                    <strong
-                      style={{
-                        color:
-                          myOutstanding > 0
-                            ? "var(--rust-light)"
-                            : "var(--sage-light)",
-                      }}
-                    >
-                      ₹{myOutstanding.toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-                </div>
+                  {(() => {
+                    const totalSqFt = p.shares.reduce(
+                      (s, sh) => s + sh.areaSqFt,
+                      0
+                    );
+                    const ownerPct = totalSqFt
+                      ? (myShare.areaSqFt / totalSqFt) * 100
+                      : 0;
+                    const ratePerSqFt = myShare.areaSqFt
+                      ? myShare.dueAmount / myShare.areaSqFt
+                      : 0;
+                    return (
+                      <div
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "var(--text-muted)",
+                          marginTop: 4,
+                        }}
+                      >
+                        How this was calculated: your flat's area (
+                        {myShare.areaSqFt} sq.ft) is {ownerPct.toFixed(2)}% of
+                        the total {totalSqFt.toLocaleString("en-IN")} sq.ft
+                        across all flats in this project, at ₹
+                        {ratePerSqFt.toFixed(2)}/sq.ft — so ₹{myShare.areaSqFt}{" "}
+                        × ₹{ratePerSqFt.toFixed(2)} = ₹
+                        {myShare.dueAmount.toLocaleString("en-IN")}.
+                      </div>
+                    );
+                  })()}
+                </>
               ) : (
                 <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
                   Your flat isn't part of this project's split.

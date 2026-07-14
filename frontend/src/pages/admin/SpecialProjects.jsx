@@ -170,18 +170,32 @@ export default function SpecialProjects() {
 }
 
 function exportSharesCSV(p) {
+  const totalSqFt = p.shares.reduce((s, sh) => s + sh.areaSqFt, 0);
   const rows = [
-    ["Flat", "Owner", "Area (sq.ft)", "Due Share", "Paid", "Outstanding"],
+    [
+      "Flat",
+      "Owner",
+      "Area (sq.ft)",
+      "Owner %",
+      "Rate/sq.ft",
+      "Due Share",
+      "Paid",
+      "Outstanding",
+    ],
   ];
   p.shares.forEach((s) => {
     const paid = p.payments
       .filter((pay) => pay.flatId === s.flatId)
       .reduce((sum, pay) => sum + pay.amount, 0);
     const outstanding = Math.max(s.dueAmount - paid, 0);
+    const ownerPct = totalSqFt ? (s.areaSqFt / totalSqFt) * 100 : 0;
+    const ratePerSqFt = s.areaSqFt ? s.dueAmount / s.areaSqFt : 0;
     rows.push([
       s.flat.flatNumber,
       s.flat.ownerName,
       s.areaSqFt,
+      ownerPct.toFixed(2),
+      ratePerSqFt.toFixed(2),
       s.dueAmount,
       paid,
       outstanding,
@@ -402,44 +416,74 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
                     <th>Flat</th>
                     <th>Owner</th>
                     <th className="right">Area (sq.ft)</th>
+                    <th className="right">Owner %</th>
+                    <th className="right">Rate/sq.ft</th>
                     <th className="right">Due Share</th>
                     <th className="right">Paid</th>
                     <th className="right">Outstanding</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {p.shares.map((s) => {
-                    const paid = p.payments
-                      .filter((pay) => pay.flatId === s.flatId)
-                      .reduce((sum, pay) => sum + pay.amount, 0);
-                    const outstanding = Math.max(s.dueAmount - paid, 0);
-                    return (
-                      <tr key={s.id}>
-                        <td>{s.flat.flatNumber}</td>
-                        <td>{s.flat.ownerName}</td>
-                        <td className="right mono">{s.areaSqFt}</td>
-                        <td className="right mono">
-                          ₹{s.dueAmount.toLocaleString("en-IN")}
-                        </td>
-                        <td className="right mono">
-                          ₹{paid.toLocaleString("en-IN")}
-                        </td>
-                        <td
-                          className="right mono"
-                          style={{
-                            color:
-                              outstanding > 0
-                                ? "var(--rust-light)"
-                                : "var(--sage-light)",
-                          }}
-                        >
-                          ₹{outstanding.toLocaleString("en-IN")}
-                        </td>
-                      </tr>
+                  {(() => {
+                    const totalSqFt = p.shares.reduce(
+                      (s, sh) => s + sh.areaSqFt,
+                      0
                     );
-                  })}
+                    return p.shares.map((s) => {
+                      const paid = p.payments
+                        .filter((pay) => pay.flatId === s.flatId)
+                        .reduce((sum, pay) => sum + pay.amount, 0);
+                      const outstanding = Math.max(s.dueAmount - paid, 0);
+                      const ownerPct = totalSqFt
+                        ? (s.areaSqFt / totalSqFt) * 100
+                        : 0;
+                      const ratePerSqFt = s.areaSqFt
+                        ? s.dueAmount / s.areaSqFt
+                        : 0;
+                      return (
+                        <tr key={s.id}>
+                          <td>{s.flat.flatNumber}</td>
+                          <td>{s.flat.ownerName}</td>
+                          <td className="right mono">{s.areaSqFt}</td>
+                          <td className="right mono">{ownerPct.toFixed(2)}%</td>
+                          <td className="right mono">
+                            ₹{ratePerSqFt.toFixed(2)}
+                          </td>
+                          <td className="right mono">
+                            ₹{s.dueAmount.toLocaleString("en-IN")}
+                          </td>
+                          <td className="right mono">
+                            ₹{paid.toLocaleString("en-IN")}
+                          </td>
+                          <td
+                            className="right mono"
+                            style={{
+                              color:
+                                outstanding > 0
+                                  ? "var(--rust-light)"
+                                  : "var(--sage-light)",
+                            }}
+                          >
+                            ₹{outstanding.toLocaleString("en-IN")}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  marginTop: 8,
+                }}
+              >
+                Owner % = this flat's area ÷ total area of all flats in this
+                project. Rate/sq.ft = due share ÷ this flat's area — this is how
+                the total target amount was split, so residents can see exactly
+                how their share was calculated.
+              </div>
             </div>
           )}
 

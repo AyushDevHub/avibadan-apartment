@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "set-areas": "node prisma/set-areas.js"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

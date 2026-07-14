@@ -57,6 +57,7 @@ export default function Residents() {
               <th>Flat</th>
               <th>Owner</th>
               <th>Tracking From</th>
+              <th className="right">Area (sq.ft)</th>
               <th className="right">Rate/mo</th>
               <th className="right">Due / Credit</th>
               <th className="right">Actions</th>
@@ -65,7 +66,7 @@ export default function Residents() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={6} className="empty-state">
+                <td colSpan={7} className="empty-state">
                   Loading…
                 </td>
               </tr>
@@ -84,6 +85,15 @@ export default function Residents() {
                 <td>{f.ownerName}</td>
                 <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
                   {f.maintenanceStartMonth || (
+                    <span style={{ color: "var(--rust-light)" }}>
+                      ⚠ Not set
+                    </span>
+                  )}
+                </td>
+                <td className="right mono">
+                  {f.areaSqFt ? (
+                    f.areaSqFt
+                  ) : (
                     <span style={{ color: "var(--rust-light)" }}>
                       ⚠ Not set
                     </span>
@@ -193,7 +203,9 @@ export default function Residents() {
               </div>
               <div className="form-group">
                 <label className="form-label">
-                  Area (sq.ft) — used to split special project funds
+                  Area (sq.ft) — used to split special project funds, and as the
+                  basis for maintenance rate if it's ever set per sq.ft in
+                  future
                 </label>
                 <input
                   type="number"
