@@ -443,6 +443,91 @@ img { display: block; max-width: 100%; }
 }
 .summary-chip strong { display: block; font-size: 1rem; color: var(--text); font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
 
+/* ── BENTO GRID ── roomier stat tiles used on Special Projects and similar
+   summary areas. Unlike .summary-bar these have generous internal padding,
+   an accent icon chip, and don't feel cramped on mobile. ── */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+@media (min-width: 640px) {
+  .bento-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.bento-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.bento-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bento-tile-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.bento-tile-icon.rust { background: var(--rust-bg); color: var(--rust-light); }
+.bento-tile-icon.sage { background: var(--sage-bg); color: var(--sage-light); }
+.bento-tile-icon.gold { background: var(--gold-bg); color: var(--gold-light); }
+.bento-tile-icon.ink  { background: var(--ink-bg);  color: var(--ink); }
+.bento-tile-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.bento-tile-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-feature-settings: 'tnum';
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-white);
+  word-break: break-word;
+}
+
+/* ── PILL TAB GROUP ── segmented-control style tabs used inside expanded
+   cards (replaces plain underlined text tabs, which were hard to scan) ── */
+.pill-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.pill-tab {
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+.pill-tab:hover { color: var(--text); }
+.pill-tab.active {
+  background: var(--bg-active);
+  color: var(--text-white);
+  font-weight: 600;
+}
+
 /* ── FORM ELEMENTS ── */
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-label { font-size: 0.78rem; font-weight: 500; color: var(--text-muted); }
@@ -477,11 +562,16 @@ img { display: block; max-width: 100%; }
 .filter-bar .form-select { width: auto; min-width: 0; flex: 1; max-width: 200px; }
 
 /* ── TABLE ── */
-.table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--border); }
-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-thead { background: var(--bg-sidebar); }
+.table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  -webkit-overflow-scrolling: touch;
+}
+table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.84rem; }
+thead { background: var(--bg-sidebar); position: sticky; top: 0; z-index: 1; }
 th {
-  padding: 10px 12px;
+  padding: 13px 16px;
   text-align: left;
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -492,12 +582,27 @@ th {
 }
 th.right, td.right { text-align: right; }
 td {
-  padding: 11px 12px;
+  padding: 14px 16px;
   border-top: 1px solid var(--border);
   color: var(--text);
   vertical-align: middle;
 }
+tbody tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 tr:hover td { background: var(--bg-hover); }
+
+/* Small hint shown above wide tables on narrow screens so it's obvious
+   the table scrolls sideways instead of just looking cut off */
+.table-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+@media (min-width: 900px) {
+  .table-scroll-hint { display: none; }
+}
 td.mono { font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum'; }
 td.empty { color: var(--text-dim); font-style: italic; }
 .table-link { color: var(--rust-light); }

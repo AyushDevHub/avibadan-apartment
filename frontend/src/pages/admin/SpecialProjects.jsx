@@ -12,6 +12,11 @@ import {
   Pencil,
   Search,
   Download,
+  Target,
+  Wallet,
+  Receipt,
+  PiggyBank,
+  MoveHorizontal,
 } from "lucide-react";
 import api from "../../api/client";
 import { PageHeader, Badge, Button } from "../../components/ui";
@@ -72,28 +77,56 @@ export default function SpecialProjects() {
       />
 
       {!!projects?.length && (
-        <div className="summary-bar">
-          <div className="summary-chip">
-            Total target
-            <strong>₹{totals.target.toLocaleString("en-IN")}</strong>
+        <div className="bento-grid">
+          <div className="bento-tile">
+            <div className="bento-tile-top">
+              <span className="bento-tile-label">Total target</span>
+              <span className="bento-tile-icon gold">
+                <Target size={16} />
+              </span>
+            </div>
+            <span className="bento-tile-value">
+              ₹{totals.target.toLocaleString("en-IN")}
+            </span>
           </div>
-          <div className="summary-chip">
-            Total collected
-            <strong>₹{totals.collected.toLocaleString("en-IN")}</strong>
+          <div className="bento-tile">
+            <div className="bento-tile-top">
+              <span className="bento-tile-label">Total collected</span>
+              <span className="bento-tile-icon sage">
+                <Wallet size={16} />
+              </span>
+            </div>
+            <span className="bento-tile-value">
+              ₹{totals.collected.toLocaleString("en-IN")}
+            </span>
           </div>
-          <div className="summary-chip">
-            Total spent
-            <strong>₹{totals.spent.toLocaleString("en-IN")}</strong>
+          <div className="bento-tile">
+            <div className="bento-tile-top">
+              <span className="bento-tile-label">Total spent</span>
+              <span className="bento-tile-icon rust">
+                <Receipt size={16} />
+              </span>
+            </div>
+            <span className="bento-tile-value">
+              ₹{totals.spent.toLocaleString("en-IN")}
+            </span>
           </div>
-          <div className="summary-chip">
-            Combined fund balance
-            <strong>₹{totals.balance.toLocaleString("en-IN")}</strong>
+          <div className="bento-tile">
+            <div className="bento-tile-top">
+              <span className="bento-tile-label">Combined fund balance</span>
+              <span className="bento-tile-icon ink">
+                <PiggyBank size={16} />
+              </span>
+            </div>
+            <span className="bento-tile-value">
+              ₹{totals.balance.toLocaleString("en-IN")}
+            </span>
           </div>
         </div>
       )}
 
       {!!projects?.length && (
-        <div className="filter-bar" style={{ marginBottom: 14 }}>
+        <div className="filter-bar" style={{ marginBottom: 20 }}>
           <div
             style={{
               position: "relative",
@@ -135,7 +168,7 @@ export default function SpecialProjects() {
       )}
 
       {isLoading && <div className="empty-state">Loading…</div>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {filtered.map((p) => (
           <ProjectCard
             key={p.id}
@@ -245,12 +278,12 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
     <div className="card">
       <div
         style={{
-          padding: "16px 20px",
+          padding: "20px 24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 16,
         }}
       >
         <div
@@ -261,27 +294,34 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
             style={{
               fontFamily: "Fraunces, serif",
               fontWeight: 600,
-              fontSize: "1rem",
+              fontSize: "1.05rem",
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
               flexWrap: "wrap",
+              marginBottom: 6,
             }}
           >
             {p.title}
             <Badge tone={STATUS_TONE[p.status]}>{p.status}</Badge>
           </div>
-          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              color: "var(--text-muted)",
+              lineHeight: 1.7,
+            }}
+          >
             Target ₹{p.targetAmount.toLocaleString("en-IN")} · Collected ₹
             {p.totalCollected.toLocaleString("en-IN")} ({pct}%) · Spent ₹
             {p.totalSpent.toLocaleString("en-IN")} · Fund balance{" "}
             <strong>₹{p.balance.toLocaleString("en-IN")}</strong>
           </div>
-          <div className="progress-track" style={{ marginTop: 8 }}>
+          <div className="progress-track" style={{ marginTop: 10 }}>
             <div className="progress-fill" style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
             className="btn-icon"
             title="Edit project"
@@ -309,8 +349,8 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
       </div>
 
       {expanded && (
-        <div style={{ padding: "0 20px 20px" }}>
-          <div className="action-bar" style={{ marginBottom: 14 }}>
+        <div style={{ padding: "4px 24px 24px" }}>
+          <div className="action-bar" style={{ marginBottom: 20 }}>
             <Button size="sm" onClick={() => setShowPayment(true)}>
               <Plus size={13} /> Record Collection
             </Button>
@@ -357,244 +397,237 @@ function ProjectCard({ project: p, expanded, onToggle, queryClient }) {
             </Button>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginBottom: 12,
-              fontSize: "0.82rem",
-              flexWrap: "wrap",
-              overflowX: "auto",
-            }}
-          >
+          <div className="pill-tabs">
             <button
               onClick={() => setTab("shares")}
-              className={tab === "shares" ? "tab-active" : "tab"}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: tab === "shares" ? 700 : 400,
-                whiteSpace: "nowrap",
-              }}
+              className={`pill-tab ${tab === "shares" ? "active" : ""}`}
             >
               Per-flat shares
             </button>
             <button
               onClick={() => setTab("payments")}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: tab === "payments" ? 700 : 400,
-                whiteSpace: "nowrap",
-              }}
+              className={`pill-tab ${tab === "payments" ? "active" : ""}`}
             >
               Collections ({p.payments.length})
             </button>
             <button
               onClick={() => setTab("expenses")}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: tab === "expenses" ? 700 : 400,
-                whiteSpace: "nowrap",
-              }}
+              className={`pill-tab ${tab === "expenses" ? "active" : ""}`}
             >
               Expenses ({p.expenses.length})
             </button>
           </div>
 
           {tab === "shares" && (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Flat</th>
-                    <th>Owner</th>
-                    <th className="right">Area (sq.ft)</th>
-                    <th className="right">Owner %</th>
-                    <th className="right">Rate/sq.ft</th>
-                    <th className="right">Due Share</th>
-                    <th className="right">Paid</th>
-                    <th className="right">Outstanding</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const totalSqFt = p.shares.reduce(
-                      (s, sh) => s + sh.areaSqFt,
-                      0
-                    );
-                    return p.shares.map((s) => {
-                      const paid = p.payments
-                        .filter((pay) => pay.flatId === s.flatId)
-                        .reduce((sum, pay) => sum + pay.amount, 0);
-                      const outstanding = Math.max(s.dueAmount - paid, 0);
-                      const ownerPct = totalSqFt
-                        ? (s.areaSqFt / totalSqFt) * 100
-                        : 0;
-                      const ratePerSqFt = s.areaSqFt
-                        ? s.dueAmount / s.areaSqFt
-                        : 0;
-                      return (
-                        <tr key={s.id}>
-                          <td>{s.flat.flatNumber}</td>
-                          <td>{s.flat.ownerName}</td>
-                          <td className="right mono">{s.areaSqFt}</td>
-                          <td className="right mono">{ownerPct.toFixed(2)}%</td>
-                          <td className="right mono">
-                            ₹{ratePerSqFt.toFixed(2)}
-                          </td>
-                          <td className="right mono">
-                            ₹{s.dueAmount.toLocaleString("en-IN")}
-                          </td>
-                          <td className="right mono">
-                            ₹{paid.toLocaleString("en-IN")}
-                          </td>
-                          <td
-                            className="right mono"
-                            style={{
-                              color:
-                                outstanding > 0
-                                  ? "var(--rust-light)"
-                                  : "var(--sage-light)",
-                            }}
-                          >
-                            ₹{outstanding.toLocaleString("en-IN")}
-                          </td>
-                        </tr>
+            <div>
+              <div className="table-scroll-hint">
+                <MoveHorizontal size={12} /> Scroll sideways to see all columns
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Flat</th>
+                      <th>Owner</th>
+                      <th className="right">Area (sq.ft)</th>
+                      <th className="right">Owner %</th>
+                      <th className="right">Rate/sq.ft</th>
+                      <th className="right">Due Share</th>
+                      <th className="right">Paid</th>
+                      <th className="right">Outstanding</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const totalSqFt = p.shares.reduce(
+                        (s, sh) => s + sh.areaSqFt,
+                        0
                       );
-                    });
-                  })()}
-                </tbody>
-              </table>
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-muted)",
-                  marginTop: 8,
-                }}
-              >
-                Owner % = this flat's area ÷ total area of all flats in this
-                project. Rate/sq.ft = due share ÷ this flat's area — this is how
-                the total target amount was split, so residents can see exactly
-                how their share was calculated.
+                      return p.shares.map((s) => {
+                        const paid = p.payments
+                          .filter((pay) => pay.flatId === s.flatId)
+                          .reduce((sum, pay) => sum + pay.amount, 0);
+                        const outstanding = Math.max(s.dueAmount - paid, 0);
+                        const ownerPct = totalSqFt
+                          ? (s.areaSqFt / totalSqFt) * 100
+                          : 0;
+                        const ratePerSqFt = s.areaSqFt
+                          ? s.dueAmount / s.areaSqFt
+                          : 0;
+                        return (
+                          <tr key={s.id}>
+                            <td>{s.flat.flatNumber}</td>
+                            <td>{s.flat.ownerName}</td>
+                            <td className="right mono">{s.areaSqFt}</td>
+                            <td className="right mono">
+                              {ownerPct.toFixed(2)}%
+                            </td>
+                            <td className="right mono">
+                              ₹{ratePerSqFt.toFixed(2)}
+                            </td>
+                            <td className="right mono">
+                              ₹{s.dueAmount.toLocaleString("en-IN")}
+                            </td>
+                            <td className="right mono">
+                              ₹{paid.toLocaleString("en-IN")}
+                            </td>
+                            <td
+                              className="right mono"
+                              style={{
+                                color:
+                                  outstanding > 0
+                                    ? "var(--rust-light)"
+                                    : "var(--sage-light)",
+                              }}
+                            >
+                              ₹{outstanding.toLocaleString("en-IN")}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--text-muted)",
+                    marginTop: 8,
+                  }}
+                >
+                  Owner % = this flat's area ÷ total area of all flats in this
+                  project. Rate/sq.ft = due share ÷ this flat's area — this is
+                  how the total target amount was split, so residents can see
+                  exactly how their share was calculated.
+                </div>
               </div>
             </div>
           )}
 
           {tab === "payments" && (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Flat</th>
-                    <th>Note</th>
-                    <th className="right">Amount</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.payments.map((pay) => (
-                    <tr key={pay.id}>
-                      <td>{new Date(pay.date).toLocaleDateString("en-IN")}</td>
-                      <td>
-                        {pay.flat.flatNumber} — {pay.flat.ownerName}
-                      </td>
-                      <td style={{ fontSize: "0.82rem" }}>{pay.note}</td>
-                      <td className="right mono">
-                        ₹{pay.amount.toLocaleString("en-IN")}
-                      </td>
-                      <td className="right">
-                        <DeleteBtn
-                          onDelete={() =>
-                            api.delete(
-                              `/special-projects/${p.id}/payments/${pay.id}`
-                            )
-                          }
-                          queryClient={queryClient}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                  {!p.payments.length && (
+            <div>
+              <div className="table-scroll-hint">
+                <MoveHorizontal size={12} /> Scroll sideways to see all columns
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <td colSpan={5} className="empty-state">
-                        No collections logged yet.
-                      </td>
+                      <th>Date</th>
+                      <th>Flat</th>
+                      <th>Note</th>
+                      <th className="right">Amount</th>
+                      <th className="right"></th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {p.payments.map((pay) => (
+                      <tr key={pay.id}>
+                        <td>
+                          {new Date(pay.date).toLocaleDateString("en-IN")}
+                        </td>
+                        <td>
+                          {pay.flat.flatNumber} — {pay.flat.ownerName}
+                        </td>
+                        <td style={{ fontSize: "0.82rem" }}>{pay.note}</td>
+                        <td className="right mono">
+                          ₹{pay.amount.toLocaleString("en-IN")}
+                        </td>
+                        <td className="right">
+                          <DeleteBtn
+                            onDelete={() =>
+                              api.delete(
+                                `/special-projects/${p.id}/payments/${pay.id}`
+                              )
+                            }
+                            queryClient={queryClient}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {!p.payments.length && (
+                      <tr>
+                        <td colSpan={5} className="empty-state">
+                          No collections logged yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {tab === "expenses" && (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Bill</th>
-                    <th className="right">Amount</th>
-                    <th className="right"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.expenses.map((ex) => (
-                    <tr key={ex.id}>
-                      <td>{new Date(ex.date).toLocaleDateString("en-IN")}</td>
-                      <td style={{ fontSize: "0.82rem" }}>{ex.description}</td>
-                      <td>
-                        {ex.billUpload ? (
-                          <a
-                            href={ex.billUpload}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="receipt-link"
-                          >
-                            <Paperclip size={13} />
-                            View
-                          </a>
-                        ) : (
-                          <span
-                            style={{
-                              color: "var(--text-muted)",
-                              fontSize: "0.78rem",
-                            }}
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td className="right mono">
-                        ₹{ex.amount.toLocaleString("en-IN")}
-                      </td>
-                      <td className="right">
-                        <DeleteBtn
-                          onDelete={() =>
-                            api.delete(
-                              `/special-projects/${p.id}/expenses/${ex.id}`
-                            )
-                          }
-                          queryClient={queryClient}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                  {!p.expenses.length && (
+            <div>
+              <div className="table-scroll-hint">
+                <MoveHorizontal size={12} /> Scroll sideways to see all columns
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <td colSpan={5} className="empty-state">
-                        No expenses logged yet.
-                      </td>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Bill</th>
+                      <th className="right">Amount</th>
+                      <th className="right"></th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {p.expenses.map((ex) => (
+                      <tr key={ex.id}>
+                        <td>{new Date(ex.date).toLocaleDateString("en-IN")}</td>
+                        <td style={{ fontSize: "0.82rem" }}>
+                          {ex.description}
+                        </td>
+                        <td>
+                          {ex.billUpload ? (
+                            <a
+                              href={ex.billUpload}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="receipt-link"
+                            >
+                              <Paperclip size={13} />
+                              View
+                            </a>
+                          ) : (
+                            <span
+                              style={{
+                                color: "var(--text-muted)",
+                                fontSize: "0.78rem",
+                              }}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td className="right mono">
+                          ₹{ex.amount.toLocaleString("en-IN")}
+                        </td>
+                        <td className="right">
+                          <DeleteBtn
+                            onDelete={() =>
+                              api.delete(
+                                `/special-projects/${p.id}/expenses/${ex.id}`
+                              )
+                            }
+                            queryClient={queryClient}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {!p.expenses.length && (
+                      <tr>
+                        <td colSpan={5} className="empty-state">
+                          No expenses logged yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
