@@ -1,17 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  X,
-  Building2,
-  Users,
-  ReceiptText,
-  PiggyBank,
-  MoveHorizontal,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import api from "../../api/client";
 import { PageHeader, Badge, Button } from "../../components/ui";
 
@@ -33,17 +23,6 @@ export default function Residents() {
     queryFn: async () => (await api.get("/flats")).data,
   });
   const [form, setForm] = useState(null);
-
-  const totals = (data || []).reduce(
-    (acc, f) => {
-      acc.count += 1;
-      if (f.status === "ACTIVE") acc.active += 1;
-      acc.due += f.totalDue || 0;
-      acc.credit += f.creditBalance || 0;
-      return acc;
-    },
-    { count: 0, active: 0, due: 0, credit: 0 }
-  );
 
   const saveMutation = useMutation({
     mutationFn: (flat) =>
@@ -71,54 +50,6 @@ export default function Residents() {
         }
       />
 
-      {!!data?.length && (
-        <div className="bento-grid">
-          <div className="bento-tile">
-            <div className="bento-tile-top">
-              <span className="bento-tile-label">Total flats</span>
-              <span className="bento-tile-icon ink">
-                <Building2 size={16} />
-              </span>
-            </div>
-            <span className="bento-tile-value">{totals.count}</span>
-          </div>
-          <div className="bento-tile">
-            <div className="bento-tile-top">
-              <span className="bento-tile-label">Active residents</span>
-              <span className="bento-tile-icon sage">
-                <Users size={16} />
-              </span>
-            </div>
-            <span className="bento-tile-value">{totals.active}</span>
-          </div>
-          <div className="bento-tile">
-            <div className="bento-tile-top">
-              <span className="bento-tile-label">Total dues</span>
-              <span className="bento-tile-icon rust">
-                <ReceiptText size={16} />
-              </span>
-            </div>
-            <span className="bento-tile-value">
-              ₹{totals.due.toLocaleString("en-IN")}
-            </span>
-          </div>
-          <div className="bento-tile">
-            <div className="bento-tile-top">
-              <span className="bento-tile-label">Total credit</span>
-              <span className="bento-tile-icon gold">
-                <PiggyBank size={16} />
-              </span>
-            </div>
-            <span className="bento-tile-value">
-              ₹{totals.credit.toLocaleString("en-IN")}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="table-scroll-hint">
-        <MoveHorizontal size={12} /> Scroll sideways to see all columns
-      </div>
       <div className="table-wrap">
         <table>
           <thead>
