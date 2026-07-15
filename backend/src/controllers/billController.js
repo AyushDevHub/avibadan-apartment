@@ -78,7 +78,23 @@ async function listBills(req, res) {
     include: { flat: true },
     orderBy: [{ month: "desc" }, { flat: { flatNumber: "asc" } }],
   });
-  res.json(bills);
+
+  // Attach how much of each bill has actually been paid, and what's left —
+  // needed so PARTIAL bills show the real remaining amount, not just the
+  // status badge, to both admin and the resident themselves.
+  const withPaid = await Promise.all(
+    bills.map(async (bill) => {
+      const agg = await prisma.payment.aggregate({
+        where: { billId: bill.id },
+        _sum: { amount: true },
+      });
+      const paidAmount = agg._sum.amount || 0;
+      const remaining = Math.max(bill.amount - paidAmount, 0);
+      return { ...bill, paidAmount, remaining };
+    })
+  );
+
+  res.json(withPaid);
 }
 
 async function updateBill(req, res) {

@@ -87,6 +87,8 @@ export default function MaintenanceBills() {
               <th>Owner</th>
               <th>Month</th>
               <th className="right">Amount</th>
+              <th className="right">Paid</th>
+              <th className="right">Balance Due</th>
               <th>Due Date</th>
               <th>Status</th>
               <th className="right">Action</th>
@@ -95,7 +97,7 @@ export default function MaintenanceBills() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="empty-state">
+                <td colSpan={9} className="empty-state">
                   Loading…
                 </td>
               </tr>
@@ -107,6 +109,18 @@ export default function MaintenanceBills() {
                 <td>{b.month}</td>
                 <td className="right mono">
                   ₹{Number(b.amount).toLocaleString("en-IN")}
+                </td>
+                <td className="right mono">
+                  ₹{Number(b.paidAmount).toLocaleString("en-IN")}
+                </td>
+                <td className="right mono">
+                  {b.status === "PARTIAL" || b.status === "UNPAID" ? (
+                    <span style={{ color: "var(--rust-light)" }}>
+                      ₹{Number(b.remaining).toLocaleString("en-IN")}
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>—</span>
+                  )}
                 </td>
                 <td>{new Date(b.dueDate).toLocaleDateString("en-IN")}</td>
                 <td>
@@ -132,7 +146,7 @@ export default function MaintenanceBills() {
             ))}
             {!isLoading && !data?.length && (
               <tr>
-                <td colSpan={7} className="empty-state">
+                <td colSpan={9} className="empty-state">
                   No bills found.
                 </td>
               </tr>

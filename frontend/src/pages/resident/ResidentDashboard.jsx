@@ -129,6 +129,7 @@ export default function ResidentDashboard() {
                       <th>Month</th>
                       <th className="right">Amount</th>
                       <th>Status</th>
+                      <th className="right">Balance Due</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -141,11 +142,22 @@ export default function ResidentDashboard() {
                         <td>
                           <Badge tone={statusTone(b.status)}>{b.status}</Badge>
                         </td>
+                        <td className="right mono">
+                          {b.status === "PARTIAL" || b.status === "UNPAID" ? (
+                            <span style={{ color: "var(--rust-light)" }}>
+                              ₹{Number(b.remaining).toLocaleString("en-IN")}
+                            </span>
+                          ) : (
+                            <span style={{ color: "var(--text-muted)" }}>
+                              —
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {!data.bills.length && (
                       <tr>
-                        <td colSpan={3} className="empty">
+                        <td colSpan={4} className="empty">
                           No bills yet.
                         </td>
                       </tr>

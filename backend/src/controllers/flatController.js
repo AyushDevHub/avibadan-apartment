@@ -25,7 +25,7 @@ async function getFlat(req, res) {
   // Ensure bills are up to date before returning so the bill list is complete.
   await syncBillStatuses(flat.id);
 
-  const [bills, payments] = await Promise.all([
+  const [billsRaw, payments] = await Promise.all([
     prisma.maintenanceBill.findMany({
       where: { flatId: flat.id },
       orderBy: { month: "desc" },
@@ -35,6 +35,18 @@ async function getFlat(req, res) {
       orderBy: { date: "desc" },
     }),
   ]);
+
+  // Same paidAmount/remaining computation as listBills — a bill's own
+  // amount minus whatever Payments (cash + adjustment) are linked to it.
+  // This is what lets "PARTIAL" show an actual rupee figure instead of
+  // just the badge.
+  const bills = billsRaw.map((bill) => {
+    const paidAmount = payments
+      .filter((p) => p.billId === bill.id)
+      .reduce((s, p) => s + p.amount, 0);
+    const remaining = Math.max(bill.amount - paidAmount, 0);
+    return { ...bill, paidAmount, remaining };
+  });
 
   const { totalDue, creditBalance } = await getFlatBalance(flat.id);
   const creditProjection =
