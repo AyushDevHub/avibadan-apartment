@@ -1,10 +1,45 @@
 const PDFDocument = require("pdfkit");
+const path = require("path");
 const prisma = require("../config/prisma");
 
 const SOCIETY_NAME = process.env.SOCIETY_NAME || "AVIBADAN APARTMENT";
 const SOCIETY_ADDRESS =
   process.env.SOCIETY_ADDRESS ||
   "361/A, G.T. ROAD (S), BATAITALA BAZAR, HOWRAH - 711103";
+// The person who physically collects maintenance and whose signature
+// appears on every receipt. Change here if the collector role changes.
+const COLLECTOR_NAME = process.env.RECEIPT_COLLECTOR_NAME || "Ukil Shaw";
+const COLLECTOR_TITLE =
+  process.env.RECEIPT_COLLECTOR_TITLE || "Maintenance Collector";
+
+// ─── PALETTE ────────────────────────────────────────────────────────────────
+const INK = "#2b241c"; // primary text
+const MAROON = "#7a2e2e"; // headings / accents
+const MAROON_DEEP = "#5c2222";
+const GOLD = "#b8874b"; // borders / rules
+const GOLD_SOFT = "#e4d3ad";
+const CREAM = "#fbf6ec"; // page background
+const CREAM_PANEL = "#f4ead6"; // amount box background
+const MUTED = "#8a7a63"; // secondary labels
+const GREEN = "#3e6b4f";
+
+// ─── FONTS ──────────────────────────────────────────────────────────────────
+const FONT_DIR = path.join(__dirname, "..", "..", "assets", "fonts");
+const F = {
+  display: path.join(FONT_DIR, "Gloock-Regular.ttf"), // society name / titles
+  serif: path.join(FONT_DIR, "CrimsonPro-Regular.ttf"), // body text
+  serifBold: path.join(FONT_DIR, "CrimsonPro-Bold.ttf"), // emphasis
+  serifItalic: path.join(FONT_DIR, "CrimsonPro-Italic.ttf"), // address / notes
+  signature: path.join(FONT_DIR, "NothingYouCouldDo-Regular.ttf"), // collector's signature
+};
+
+function registerFonts(doc) {
+  doc.registerFont("display", F.display);
+  doc.registerFont("serif", F.serif);
+  doc.registerFont("serifBold", F.serifBold);
+  doc.registerFont("serifItalic", F.serifItalic);
+  doc.registerFont("signature", F.signature);
+}
 
 function toWords(num) {
   const ones = [
@@ -69,30 +104,271 @@ function toWords(num) {
   return parts.join(" ");
 }
 
+// ─── ORNAMENTS ──────────────────────────────────────────────────────────────
+
+// Cream page fill + a fine gold outer rule and a hairline inner rule, with
+// small L-shaped corner ticks — the "certificate" look.
+function drawFrame(doc, M, pageW, pageH) {
+  doc.rect(0, 0, pageW, pageH).fill(CREAM);
+
+  const outer = M;
+  const inner = M + 9;
+  doc.lineWidth(1.4).strokeColor(GOLD);
+  doc.rect(outer, outer, pageW - outer * 2, pageH - outer * 2).stroke();
+  doc.lineWidth(0.6).strokeColor(GOLD_SOFT);
+  doc.rect(inner, inner, pageW - inner * 2, pageH - inner * 2).stroke();
+
+  const tick = 14;
+  const corners = [
+    [outer, outer, 1, 1],
+    [pageW - outer, outer, -1, 1],
+    [outer, pageH - outer, 1, -1],
+    [pageW - outer, pageH - outer, -1, -1],
+  ];
+  doc.lineWidth(1.6).strokeColor(MAROON);
+  corners.forEach(([x, y, dx, dy]) => {
+    doc
+      .moveTo(x, y + dy * tick)
+      .lineTo(x, y)
+      .lineTo(x + dx * tick, y)
+      .stroke();
+  });
+}
+
+// Extremely faint, large, rotated society initials behind the content —
+// like security watermark paper. Purely decorative, never interferes with
+// legibility since opacity is very low.
+function drawWatermark(doc, pageW, pageH) {
+  // The rotated, oversized watermark text's un-rotated bounding box can
+  // exceed the page height, which would otherwise make PDFKit silently
+  // start a second page mid-draw. Suppress pagination just for this call.
+  const originalAddPage = doc.addPage.bind(doc);
+  doc.addPage = () => doc;
+
+  doc.save();
+  doc.opacity(0.05);
+  doc
+    .font("display")
+    .fontSize(Math.min(pageW, pageH) * 0.42)
+    .fillColor(MAROON);
+  doc.rotate(-28, { origin: [pageW / 2, pageH / 2] });
+  doc.text("AVIBADAN", 0, pageH / 2 - 60, {
+    width: pageW,
+    align: "center",
+    lineBreak: false,
+  });
+  doc.restore();
+  doc.opacity(1);
+
+  doc.addPage = originalAddPage;
+}
+
+// A small circular seal with the society's initials — stands in for a crest
+// since no logo image is available.
+function drawSeal(doc, cx, cy, r) {
+  doc.save();
+  doc.lineWidth(1.2).strokeColor(MAROON);
+  doc.circle(cx, cy, r).stroke();
+  doc.lineWidth(0.6).strokeColor(GOLD);
+  doc.circle(cx, cy, r - 4).stroke();
+  doc
+    .font("display")
+    .fontSize(r * 0.62)
+    .fillColor(MAROON)
+    .text("AV", cx - r, cy - r * 0.42, { width: r * 2, align: "center" });
+  doc.restore();
+}
+
 function drawHeader(doc, M, pageW, innerW) {
-  let y = M + 16;
+  let y = M + 26;
+  const sealR = 20;
+  drawSeal(doc, pageW / 2, y + 2, sealR);
+  y += sealR * 2 + 14;
+
   doc
-    .fontSize(17)
-    .font("Helvetica-Bold")
-    .fillColor("#1a1e25")
-    .text(SOCIETY_NAME, M, y, { width: innerW, align: "center" });
-  y += 22;
+    .font("display")
+    .fontSize(19)
+    .fillColor(MAROON_DEEP)
+    .text(SOCIETY_NAME, M, y, {
+      width: innerW,
+      align: "center",
+      characterSpacing: 1.6,
+    });
+  y += 26;
   doc
-    .fontSize(8.5)
-    .font("Helvetica")
-    .fillColor("#5a6478")
+    .font("serifItalic")
+    .fontSize(9)
+    .fillColor(MUTED)
     .text(SOCIETY_ADDRESS, M, y, { width: innerW, align: "center" });
+  y += 20;
+
+  // Ornamental center-diamond divider
+  const midX = pageW / 2;
+  doc
+    .moveTo(M + 20, y)
+    .lineTo(midX - 8, y)
+    .strokeColor(GOLD)
+    .lineWidth(0.8)
+    .stroke();
+  doc
+    .moveTo(midX + 8, y)
+    .lineTo(pageW - M - 20, y)
+    .stroke();
+  doc.save();
+  doc.translate(midX, y);
+  doc.rotate(45);
+  doc.rect(-4, -4, 8, 8).fillColor(GOLD).fill();
+  doc.restore();
+
+  return y + 16;
+}
+
+// The maroon banner bearing the receipt's title (e.g. "MAINTENANCE PAYMENT
+// RECEIPT"), rendered in cream letter-spaced caps.
+function drawTitleBanner(doc, title, M, pageW, innerW, y) {
+  const h = 24;
+  doc.rect(M + 16, y, innerW - 32, h).fill(MAROON);
+  doc
+    .font("display")
+    .fontSize(11)
+    .fillColor(CREAM)
+    .text(title, M + 16, y + 7, {
+      width: innerW - 32,
+      align: "center",
+      characterSpacing: 2,
+    });
+  return y + h + 18;
+}
+
+function drawMetaRow(doc, receiptNo, dateLabel, M, pageW, innerW, y) {
+  doc.font("serifBold").fontSize(9.5).fillColor(INK);
+  doc.text(`Receipt No.  ${receiptNo}`, M + 16, y, { width: innerW / 2 - 16 });
+  doc.text(`Date  ${dateLabel}`, M + 16, y, {
+    width: innerW - 32,
+    align: "right",
+  });
   y += 18;
   doc
     .moveTo(M + 16, y)
     .lineTo(pageW - M - 16, y)
-    .strokeColor("#d6cdb8")
+    .strokeColor(GOLD_SOFT)
+    .lineWidth(0.6)
     .stroke();
-  y += 10;
-  return y;
+  return y + 16;
 }
 
-// Single-payment receipt.
+// One label/value line with a fine dotted leader, like a formal certificate
+// field ("Received from ..........................").
+function drawFieldRow(doc, label, value, M, innerW, y, opts = {}) {
+  const labelW = opts.labelW || 118;
+  doc
+    .font("serif")
+    .fontSize(9.5)
+    .fillColor(MUTED)
+    .text(label, M + 16, y, { width: labelW });
+  const valueX = M + 16 + labelW;
+  const valueW = innerW - 32 - labelW;
+  doc
+    .font("serifBold")
+    .fontSize(10)
+    .fillColor(INK)
+    .text(value, valueX, y - 1, { width: valueW });
+  const h = doc.heightOfString(value, { width: valueW });
+  return y + Math.max(h, 13) + 10;
+}
+
+// The boxed "Sum of Rupees" amount panel — the certificate-style highlight
+// of the receipt, echoing a bank pay-in slip.
+function drawAmountPanel(doc, amount, M, innerW, y) {
+  const wordsText = `(${toWords(amount)} Rupees Only)`;
+  const wordsW = innerW - 60;
+  doc.font("serifItalic").fontSize(8.5);
+  const wordsH = doc.heightOfString(wordsText, { width: wordsW });
+  const boxH = Math.max(68, 52 + wordsH + 10);
+
+  doc.rect(M + 16, y, innerW - 32, boxH).fill(CREAM_PANEL);
+  doc
+    .lineWidth(0.8)
+    .strokeColor(GOLD)
+    .rect(M + 16, y, innerW - 32, boxH)
+    .stroke();
+
+  doc
+    .font("serif")
+    .fontSize(8.5)
+    .fillColor(MUTED)
+    .text("SUM OF RUPEES", M + 28, y + 10, { characterSpacing: 1 });
+  doc
+    .font("display")
+    .fontSize(17)
+    .fillColor(MAROON_DEEP)
+    .text(`Rs. ${amount.toLocaleString("en-IN")}/-`, M + 28, y + 24);
+  doc
+    .font("serifItalic")
+    .fontSize(8.5)
+    .fillColor(INK)
+    .text(wordsText, M + 28, y + 52, { width: wordsW });
+
+  return y + boxH + 18;
+}
+
+// Cursive collector signature + printed name/title, drawn just above the
+// footer rule on the right-hand side.
+function drawSignatureBlock(doc, M, pageW, innerW, y) {
+  const blockW = 190;
+  const x = pageW - M - 16 - blockW;
+
+  doc
+    .font("serif")
+    .fontSize(8.5)
+    .fillColor(MUTED)
+    .text(`For ${SOCIETY_NAME}`, x, y, { width: blockW, align: "center" });
+  y += 14;
+
+  doc
+    .font("signature")
+    .fontSize(26)
+    .fillColor(MAROON_DEEP)
+    .text(COLLECTOR_NAME, x, y, { width: blockW, align: "center" });
+  y += 34;
+
+  doc
+    .moveTo(x + 16, y)
+    .lineTo(x + blockW - 16, y)
+    .strokeColor(GOLD)
+    .lineWidth(0.7)
+    .stroke();
+  y += 6;
+
+  doc
+    .font("serifBold")
+    .fontSize(9.5)
+    .fillColor(INK)
+    .text(COLLECTOR_NAME, x, y, { width: blockW, align: "center" });
+  y += 13;
+  doc
+    .font("serifItalic")
+    .fontSize(8)
+    .fillColor(MUTED)
+    .text(COLLECTOR_TITLE, x, y, { width: blockW, align: "center" });
+
+  return y + 14;
+}
+
+function drawFootnote(doc, M, pageW, innerW, pageH) {
+  doc
+    .font("serifItalic")
+    .fontSize(7)
+    .fillColor(MUTED)
+    .text(
+      "This is a system-generated receipt and is valid without a physical stamp.",
+      M + 16,
+      pageH - M - 18,
+      { width: innerW - 32, align: "center" }
+    );
+}
+
+// ─── SINGLE-PAYMENT RECEIPT ────────────────────────────────────────────────
 async function downloadReceipt(req, res) {
   const payment = await prisma.payment.findUnique({
     where: { id: req.params.id },
@@ -100,7 +376,6 @@ async function downloadReceipt(req, res) {
   });
   if (!payment) return res.status(404).json({ message: "Payment not found" });
 
-  // If this payment belongs to a group, redirect to the group receipt.
   if (payment.groupReceiptNo) {
     return res.redirect(
       `/api/receipts/group/${encodeURIComponent(payment.groupReceiptNo)}`
@@ -114,69 +389,43 @@ async function downloadReceipt(req, res) {
   );
 
   const doc = new PDFDocument({ size: "A5", margin: 0 });
+  registerFonts(doc);
   doc.pipe(res);
-  const M = 28,
+  const M = 26,
     pageW = doc.page.width,
+    pageH = doc.page.height,
     innerW = pageW - M * 2;
-  doc.rect(M, M, innerW, doc.page.height - M * 2).stroke("#a05530");
+
+  drawFrame(doc, M, pageW, pageH);
+  drawWatermark(doc, pageW, pageH);
 
   let y = drawHeader(doc, M, pageW, innerW);
-  doc
-    .fontSize(12)
-    .font("Helvetica-Bold")
-    .fillColor("#a05530")
-    .text("MAINTENANCE PAYMENT RECEIPT", M, y, {
-      width: innerW,
-      align: "center",
-    });
-  y += 22;
-  doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#1a1e25");
-  doc.text(`Receipt No: ${payment.receiptNo}`, M + 16, y);
-  doc.text(
-    `Date: ${payment.date.toLocaleDateString("en-IN", {
+  y = drawTitleBanner(doc, "MAINTENANCE PAYMENT RECEIPT", M, pageW, innerW, y);
+  y = drawMetaRow(
+    doc,
+    payment.receiptNo,
+    payment.date.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-    })}`,
-    M + 16,
-    y,
-    { width: innerW - 32, align: "right" }
+    }),
+    M,
+    pageW,
+    innerW,
+    y
   );
-  y += 20;
-  doc
-    .moveTo(M + 16, y)
-    .lineTo(pageW - M - 16, y)
-    .strokeColor("#d6cdb8")
-    .stroke();
-  y += 14;
 
-  const lW = 110;
-  function row(label, value) {
-    doc
-      .fontSize(9.5)
-      .font("Helvetica")
-      .fillColor("#5a6478")
-      .text(label, M + 16, y, { width: lW });
-    doc
-      .fontSize(9.5)
-      .font("Helvetica-Bold")
-      .fillColor("#1a1e25")
-      .text(value, M + 16 + lW, y, { width: innerW - 32 - lW });
-    y += doc.heightOfString(value, { width: innerW - 32 - lW }) + 8;
-  }
-
-  row(
-    "Received from:",
-    `${payment.flat.ownerName} (${payment.flat.flatNumber})`
+  y = drawFieldRow(
+    doc,
+    "Received from",
+    `${payment.flat.ownerName}  (${payment.flat.flatNumber})`,
+    M,
+    innerW,
+    y
   );
-  row(
-    "Sum of Rupees:",
-    `₹${payment.amount.toLocaleString("en-IN")} (${toWords(
-      payment.amount
-    )} Rupees Only)`
-  );
-  row(
-    "For:",
+  y = drawFieldRow(
+    doc,
+    "Towards",
     `Maintenance charges — ${
       payment.bill
         ? payment.bill.month
@@ -184,50 +433,31 @@ async function downloadReceipt(req, res) {
             month: "long",
             year: "numeric",
           })
-    }`
+    }`,
+    M,
+    innerW,
+    y
   );
-  row(
-    "Mode:",
-    payment.mode === "ADJUSTMENT" ? "Adjustment/Waiver" : payment.mode
+  y = drawFieldRow(
+    doc,
+    "Mode of payment",
+    payment.mode === "ADJUSTMENT" ? "Adjustment / Waiver" : payment.mode,
+    M,
+    innerW,
+    y
   );
-  if (payment.note) row("Note:", payment.note);
+  if (payment.note) y = drawFieldRow(doc, "Note", payment.note, M, innerW, y);
 
-  y += 10;
-  doc
-    .moveTo(M + 16, y)
-    .lineTo(pageW - M - 16, y)
-    .strokeColor("#d6cdb8")
-    .stroke();
-  y += 24;
-  doc
-    .fontSize(9)
-    .font("Helvetica")
-    .fillColor("#5a6478")
-    .text(`For ${SOCIETY_NAME}`, M + 16, y, {
-      width: innerW - 32,
-      align: "right",
-    });
-  y += 36;
-  doc
-    .fontSize(9)
-    .font("Helvetica-Bold")
-    .fillColor("#1a1e25")
-    .text("Authorized Signatory", M + 16, y, {
-      width: innerW - 32,
-      align: "right",
-    });
-  doc
-    .fontSize(7)
-    .font("Helvetica-Oblique")
-    .fillColor("#9a9180")
-    .text("System-generated receipt.", M + 16, doc.page.height - M - 20, {
-      width: innerW - 32,
-      align: "center",
-    });
+  y += 4;
+  y = drawAmountPanel(doc, payment.amount, M, innerW, y);
+
+  drawSignatureBlock(doc, M, pageW, innerW, pageH - M - 92);
+  drawFootnote(doc, M, pageW, innerW, pageH);
+
   doc.end();
 }
 
-// Consolidated group receipt — one PDF for all months in a multi-month payment.
+// ─── CONSOLIDATED GROUP RECEIPT ────────────────────────────────────────────
 async function downloadGroupReceipt(req, res) {
   const groupReceiptNo = decodeURIComponent(req.params.groupNo);
   const payments = await prisma.payment.findMany({
@@ -243,7 +473,6 @@ async function downloadGroupReceipt(req, res) {
   const payDate = payments[0].date;
   const mode = payments[0].mode;
 
-  // Find actual months covered (exclude advance credit entries).
   const monthPayments = payments.filter((p) => p.bill);
   const advancePayment = payments.find((p) => !p.bill);
   const paidThrough = monthPayments.length
@@ -257,163 +486,138 @@ async function downloadGroupReceipt(req, res) {
   );
 
   const doc = new PDFDocument({ size: "A4", margin: 0 });
+  registerFonts(doc);
   doc.pipe(res);
-  const M = 32,
+  const M = 30,
     pageW = doc.page.width,
+    pageH = doc.page.height,
     innerW = pageW - M * 2;
-  doc.rect(M, M, innerW, doc.page.height - M * 2).stroke("#a05530");
+
+  drawFrame(doc, M, pageW, pageH);
+  drawWatermark(doc, pageW, pageH);
 
   let y = drawHeader(doc, M, pageW, innerW);
-  doc
-    .fontSize(13)
-    .font("Helvetica-Bold")
-    .fillColor("#a05530")
-    .text("CONSOLIDATED MAINTENANCE RECEIPT", M, y, {
-      width: innerW,
-      align: "center",
-    });
-  y += 24;
-  doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#1a1e25");
-  doc.text(`Receipt No: ${groupReceiptNo}`, M + 16, y);
-  doc.text(
-    `Date: ${payDate.toLocaleDateString("en-IN", {
+  y = drawTitleBanner(
+    doc,
+    "CONSOLIDATED MAINTENANCE RECEIPT",
+    M,
+    pageW,
+    innerW,
+    y
+  );
+  y = drawMetaRow(
+    doc,
+    groupReceiptNo,
+    payDate.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-    })}`,
-    M + 16,
+    }),
+    M,
+    pageW,
+    innerW,
+    y
+  );
+
+  y = drawFieldRow(
+    doc,
+    "Received from",
+    `${flat.ownerName}  (${flat.flatNumber})`,
+    M,
+    innerW,
     y,
-    { width: innerW - 32, align: "right" }
+    { labelW: 130 }
   );
+  y = drawFieldRow(
+    doc,
+    "Mode of payment",
+    mode === "ADJUSTMENT" ? "Adjustment / Waiver" : mode,
+    M,
+    innerW,
+    y,
+    { labelW: 130 }
+  );
+  if (paidThrough)
+    y = drawFieldRow(doc, "Paid through", paidThrough, M, innerW, y, {
+      labelW: 130,
+    });
+  if (payments[0].note)
+    y = drawFieldRow(doc, "Note", payments[0].note, M, innerW, y, {
+      labelW: 130,
+    });
+
+  y += 6;
+  y = drawAmountPanel(doc, totalAmount, M, innerW, y);
+  y += 6;
+
+  // Month-wise breakdown table
+  doc
+    .font("display")
+    .fontSize(10.5)
+    .fillColor(MAROON_DEEP)
+    .text("Month-wise Breakdown", M + 16, y, { characterSpacing: 0.6 });
   y += 20;
-  doc
-    .moveTo(M + 16, y)
-    .lineTo(pageW - M - 16, y)
-    .strokeColor("#d6cdb8")
-    .stroke();
-  y += 14;
 
-  // Summary block
-  const lW = 130;
-  function row(label, value) {
-    doc
-      .fontSize(9.5)
-      .font("Helvetica")
-      .fillColor("#5a6478")
-      .text(label, M + 16, y, { width: lW });
-    doc
-      .fontSize(9.5)
-      .font("Helvetica-Bold")
-      .fillColor("#1a1e25")
-      .text(value, M + 16 + lW, y, { width: innerW - 32 - lW });
-    y += 16;
-  }
-  row("Received from:", `${flat.ownerName} (${flat.flatNumber})`);
-  row(
-    "Total Amount:",
-    `₹${totalAmount.toLocaleString("en-IN")} (${toWords(
-      totalAmount
-    )} Rupees Only)`
-  );
-  row("Payment Mode:", mode === "ADJUSTMENT" ? "Adjustment/Waiver" : mode);
-  if (paidThrough) row("Paid Through:", paidThrough);
-  if (payments[0].note) row("Note:", payments[0].note);
+  const colX = [M + 16, M + 16 + 130, M + 16 + 270, M + 16 + 390];
+  const colW = [130, 140, 120, innerW - 32 - 390];
 
-  y += 12;
-  doc
-    .moveTo(M + 16, y)
-    .lineTo(pageW - M - 16, y)
-    .strokeColor("#d6cdb8")
-    .stroke();
-  y += 14;
+  doc.rect(M + 16, y, innerW - 32, 20).fill(MAROON);
+  doc.font("serifBold").fontSize(9).fillColor(CREAM);
+  doc.text("MONTH", colX[0] + 6, y + 5, { width: colW[0] - 6 });
+  doc.text("AMOUNT", colX[1], y + 5, { width: colW[1], align: "right" });
+  doc.text("MODE", colX[2], y + 5, { width: colW[2] });
+  doc.text("STATUS", colX[3], y + 5, { width: colW[3] });
+  y += 20;
 
-  // Breakdown table
-  doc
-    .fontSize(9.5)
-    .font("Helvetica-Bold")
-    .fillColor("#1a1e25")
-    .text("Month-wise Breakdown", M + 16, y);
-  y += 16;
-
-  // Table header
-  doc.rect(M + 16, y, innerW - 32, 18).fill("#1a1e25");
-  doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#ffffff");
-  doc.text("Month", M + 22, y + 4, { width: 100 });
-  doc.text("Amount (₹)", M + 22 + 100, y + 4, { width: 120 });
-  doc.text("Mode", M + 22 + 220, y + 4, { width: 80 });
-  doc.text("Status", M + 22 + 300, y + 4, { width: 80 });
-  y += 18;
-
-  // Table rows
-  for (const p of monthPayments) {
-    const isEven = monthPayments.indexOf(p) % 2 === 0;
-    if (isEven) doc.rect(M + 16, y, innerW - 32, 16).fill("#f9f6ef");
-    doc.fontSize(8.5).font("Helvetica").fillColor("#1a1e25");
-    doc.text(p.bill?.month || "—", M + 22, y + 3, { width: 100 });
-    doc.text(`₹${p.amount.toLocaleString("en-IN")}`, M + 22 + 100, y + 3, {
-      width: 120,
+  const rowH = 19;
+  monthPayments.forEach((p, i) => {
+    if (i % 2 === 0) doc.rect(M + 16, y, innerW - 32, rowH).fill(CREAM_PANEL);
+    doc.font("serif").fontSize(9).fillColor(INK);
+    doc.text(p.bill?.month || "—", colX[0] + 6, y + 5, { width: colW[0] - 6 });
+    doc.text(`Rs. ${p.amount.toLocaleString("en-IN")}`, colX[1], y + 5, {
+      width: colW[1],
+      align: "right",
     });
-    doc.text(p.mode === "ADJUSTMENT" ? "Waiver" : p.mode, M + 22 + 220, y + 3, {
-      width: 80,
+    doc.text(p.mode === "ADJUSTMENT" ? "Waiver" : p.mode, colX[2], y + 5, {
+      width: colW[2],
     });
-    doc.text("PAID", M + 22 + 300, y + 3, { width: 80, color: "#3e7a52" });
-    y += 16;
-  }
+    doc.fillColor(GREEN).text("PAID", colX[3], y + 5, { width: colW[3] });
+    y += rowH;
+  });
+
   if (advancePayment) {
-    doc.rect(M + 16, y, innerW - 32, 16).fill("#fbf3e3");
-    doc.fontSize(8.5).font("Helvetica").fillColor("#1a1e25");
-    doc.text("Advance Credit", M + 22, y + 3, { width: 100 });
+    doc.rect(M + 16, y, innerW - 32, rowH).fill(GOLD_SOFT);
+    doc.font("serif").fontSize(9).fillColor(INK);
+    doc.text("Advance Credit", colX[0] + 6, y + 5, { width: colW[0] - 6 });
     doc.text(
-      `₹${advancePayment.amount.toLocaleString("en-IN")}`,
-      M + 22 + 100,
-      y + 3,
-      { width: 120 }
+      `Rs. ${advancePayment.amount.toLocaleString("en-IN")}`,
+      colX[1],
+      y + 5,
+      { width: colW[1], align: "right" }
     );
     doc.text(
       advancePayment.mode === "ADJUSTMENT" ? "Waiver" : advancePayment.mode,
-      M + 22 + 220,
-      y + 3,
-      { width: 80 }
+      colX[2],
+      y + 5,
+      { width: colW[2] }
     );
-    doc.text("CREDITED", M + 22 + 300, y + 3, { width: 80 });
-    y += 16;
+    doc
+      .fillColor(MAROON_DEEP)
+      .text("CREDITED", colX[3], y + 5, { width: colW[3] });
+    y += rowH;
   }
 
-  // Total row
-  doc.rect(M + 16, y, innerW - 32, 20).fill("#1a1e25");
-  doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#ffffff");
-  doc.text("TOTAL", M + 22, y + 5, { width: 100 });
-  doc.text(`₹${totalAmount.toLocaleString("en-IN")}`, M + 22 + 100, y + 5, {
-    width: 220,
+  doc.rect(M + 16, y, innerW - 32, 22).fill(MAROON);
+  doc.font("serifBold").fontSize(10).fillColor(CREAM);
+  doc.text("TOTAL", colX[0] + 6, y + 6, { width: colW[0] - 6 });
+  doc.text(`Rs. ${totalAmount.toLocaleString("en-IN")}`, colX[1], y + 6, {
+    width: colW[1],
+    align: "right",
   });
-  y += 20;
 
-  y += 30;
-  doc
-    .fontSize(9)
-    .font("Helvetica")
-    .fillColor("#5a6478")
-    .text(`For ${SOCIETY_NAME}`, M + 16, y, {
-      width: innerW - 32,
-      align: "right",
-    });
-  y += 36;
-  doc
-    .fontSize(9)
-    .font("Helvetica-Bold")
-    .fillColor("#1a1e25")
-    .text("Authorized Signatory", M + 16, y, {
-      width: innerW - 32,
-      align: "right",
-    });
-  doc
-    .fontSize(7)
-    .font("Helvetica-Oblique")
-    .fillColor("#9a9180")
-    .text("System-generated receipt.", M + 16, doc.page.height - M - 20, {
-      width: innerW - 32,
-      align: "center",
-    });
+  drawSignatureBlock(doc, M, pageW, innerW, pageH - M - 100);
+  drawFootnote(doc, M, pageW, innerW, pageH);
+
   doc.end();
 }
 
